@@ -3,20 +3,19 @@
   "name": "Spam Classifier for Gmail",
   "version": "1.0",
   "description": "Uses a local Naive Bayes API to classify selected text or emails as Spam or Ham.",
-  "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["http://localhost:8000/*"],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://spam-classification-end-sem.onrender.com/*", "https://mail.google.com/*"],
+  "background": {
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "css": ["content.css"]
     }
-  ]
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
 }

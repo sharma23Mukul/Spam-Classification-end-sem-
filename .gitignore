@@ -20,3 +20,4 @@ Thumbs.db
 
 # Streamlit config
 .streamlit/credentials.toml
+data/kaggle_emails.csv

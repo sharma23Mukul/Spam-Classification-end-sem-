@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const errorMsg = document.getElementById('error');
 
   // Ensure FastAPI server URL is correct
-  const API_URL = "http://localhost:8000/predict";
+  const API_URL = "https://spam-classification-end-sem.onrender.com/predict";
 
   checkBtn.addEventListener('click', async () => {
     // Reset UI
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       // 1. Get the active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      
+
       // 2. Inject a script to pull the text from Gmail
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -50,10 +50,10 @@ document.addEventListener('DOMContentLoaded', () => {
       // 4. Update UI with results
       loading.style.display = 'none';
       resultDiv.style.display = 'block';
-      
+
       // Strip previous classes
       resultDiv.className = '';
-      
+
       if (data.prediction === 'spam') {
         resultDiv.classList.add('spam');
         predBadge.innerText = '🔴 SPAM DETECTED';
@@ -92,12 +92,12 @@ function extractEmailText() {
   // Gmail typically puts the email body inside elements with class 'a3s' or 'ii gt'
   // Or if it's an open thread, it tries to grab the visible text.
   const emailBodies = document.querySelectorAll('.a3s.aiL');
-  
+
   if (emailBodies.length > 0) {
     // Get the last one (usually the most recent email in the thread)
     return emailBodies[emailBodies.length - 1].innerText;
   }
-  
+
   // Fallback: grab all text on the page (messy but works as a fallback)
   return window.getSelection().toString() || document.body.innerText.substring(0, 5000);
 }
