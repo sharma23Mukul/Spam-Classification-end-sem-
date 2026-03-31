@@ -80,82 +80,78 @@ def load_sms_data(filepath=None):
     return data
 
 
-def load_kaggle_data(filepath=None, limit=20000):
+def load_csv_directory(directory_path=None, limit_per_file=20000):
     """
-    Load a custom CSV dataset (like the Kaggle Email Classification NLP dataset).
-
-    This dataset contains multiple classes like:
-    - Primary, Updates, Personal (Map to 'ham')
-    - Promotional, Spam, Phishing (Map to 'spam')
-
-    Depending on the user's preference for 'promotional' messages.
+    Load all CSV files from a specific directory and automatically 
+    parse their text and label columns.
     """
     import csv
+    import glob
 
-    if filepath is None:
-        filepath = os.path.join(
+    if directory_path is None:
+        directory_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
-            "kaggle_emails.csv"
+            "custom_datasets"
         )
 
-    if not os.path.exists(filepath):
-        # We don't print a warning by default because it's optional
+    # Ensure the directory exists
+    os.makedirs(directory_path, exist_ok=True)
+
+    csv_files = glob.glob(os.path.join(directory_path, "*.csv"))
+    
+    if not csv_files:
         return []
 
     data = []
-    print(f"\n  [>>] Found Kaggle dataset at: {filepath}, parsing...")
+    print(f"\n  [>>] Found {len(csv_files)} custom CSV datasets in: {os.path.basename(directory_path)}/, parsing...")
 
-    # Mapping common Kaggle multi-class labels to binary Spam/Ham
-    # The user requested that Promotional should be treated distinctly from Important Notifications (Updates)
-    # We will map "promotion" and "spam" to 'spam'.
-    # We will map "update", "primary", "personal" to 'ham'.
     spam_classes = {'spam', 'promotion', 'promotional', 'phishing'}
-    ham_classes = {'ham', 'update', 'updates', 'primary', 'personal', 'social'}
+    ham_classes = {'ham', 'update', 'updates', 'primary', 'personal', 'social', 'notification'}
 
-    try:
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-            reader = csv.DictReader(f)
-            
-            # Find probable columns for text and label since Kaggle CSVs vary
-            text_col = next((c for c in reader.fieldnames if c.lower() in ('text', 'email', 'message', 'body', 'content')), None)
-            label_col = next((c for c in reader.fieldnames if c.lower() in ('label', 'category', 'class', 'type')), None)
-            
-            if not text_col or not label_col:
-                print(f"  [!!] Kaggle CSV is missing clear 'text' or 'label' columns. Found: {reader.fieldnames}")
-                return []
+    for filepath in csv_files:
+        filename = os.path.basename(filepath)
+        print(f"      -> Parsing {filename}...")
+        
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                reader = csv.DictReader(f)
                 
-            count = 0
-            for row in reader:
-                if count >= limit:
-                    break
-                    
-                raw_label = row[label_col].strip().lower()
-                text = row[text_col].strip()
+                text_col = next((c for c in reader.fieldnames if c and c.lower() in ('text', 'email', 'message', 'body', 'content', 'sms')), None)
+                label_col = next((c for c in reader.fieldnames if c and c.lower() in ('label', 'category', 'class', 'type', 'target')), None)
                 
-                if not text:
+                if not text_col or not label_col:
+                    print(f"        [!!] Skipping {filename}: Missing clear 'text' or 'label' columns. Found: {reader.fieldnames}")
                     continue
                     
-                # Map to binary
-                binary_label = None
-                if raw_label in spam_classes:
-                    binary_label = 'spam'
-                elif raw_label in ham_classes:
-                    binary_label = 'ham'
+                count = 0
+                for row in reader:
+                    if count >= limit_per_file:
+                        break
+                        
+                    raw_label = str(row.get(label_col, '')).strip().lower()
+                    text = str(row.get(text_col, '')).strip()
                     
-                # Strict fallback for datasets that just use 1/0
-                if binary_label == None:
-                    if raw_label == '1': binary_label = 'spam'
-                    elif raw_label == '0': binary_label = 'ham'
-                    else: continue
-                
-                data.append((binary_label, text[:1500])) # truncate to save memory
-                count += 1
-                
-        return data
-        
-    except Exception as e:
-        print(f"  [!!] Failed to parse Kaggle dataset: {e}")
-        return []
+                    if not text:
+                        continue
+                        
+                    binary_label = None
+                    if raw_label in spam_classes:
+                        binary_label = 'spam'
+                    elif raw_label in ham_classes:
+                        binary_label = 'ham'
+                        
+                    if binary_label == None:
+                        if raw_label == '1': binary_label = 'spam'
+                        elif raw_label == '0': binary_label = 'ham'
+                        else: continue
+                    
+                    data.append((binary_label, text[:1500]))
+                    count += 1
+                    
+        except Exception as e:
+            print(f"        [!!] Failed to parse {filename}: {e}")
+
+    return data
 
 def load_all_data():
     """
@@ -205,20 +201,20 @@ def load_all_data():
         print(f"\n  Dataset 2: SpamAssassin (not downloaded, skipping)")
         print(f"    Run 'python download_data.py' to download additional datasets")
 
-    # ─── Load Kaggle Data ───────────────────────────────────────
-    kaggle_data = load_kaggle_data()
-    if kaggle_data:
-        k_spam = sum(1 for l, _ in kaggle_data if l == 'spam')
-        k_ham = len(kaggle_data) - k_spam
-        print(f"\n  Dataset 3: Kaggle Email Classification Dataset")
-        print(f"    Total: {len(kaggle_data)} emails")
-        print(f"    Spam/Promo: {k_spam}, Ham/Updt: {k_ham}")
+    # ─── Load Custom CSV Datasets ───────────────────────────────
+    custom_data = load_csv_directory()
+    if custom_data:
+        c_spam = sum(1 for l, _ in custom_data if l == 'spam')
+        c_ham = len(custom_data) - c_spam
+        print(f"\n  Dataset 3: Custom CSV Datasets")
+        print(f"    Total: {len(custom_data)} emails")
+        print(f"    Spam/Promo: {c_spam}, Ham/Updt: {c_ham}")
     else:
-        print(f"\n  Dataset 3: Kaggle Email Classification (not found, skipping)")
-        print(f"    To use, save Kaggle CSV as: data/kaggle_emails.csv")
+        print(f"\n  Dataset 3: Custom CSV Datasets (not found, skipping)")
+        print(f"    To use, drop ANY .csv files into: data/custom_datasets/")
 
     # ─── Merge All Datasets ─────────────────────────────────────
-    all_data = sms_data + sa_data + kaggle_data
+    all_data = sms_data + sa_data + custom_data
 
     total_spam = sum(1 for l, _ in all_data if l == 'spam')
     total_ham = len(all_data) - total_spam
@@ -230,7 +226,7 @@ def load_all_data():
     print(f"    Total messages: {len(all_data)}")
     print(f"    Spam: {total_spam} ({spam_ratio:.1f}%)")
     print(f"    Ham:  {total_ham} ({100-spam_ratio:.1f}%)")
-    print(f"    Sources: {len([1 for d in [sms_data, sa_data, kaggle_data] if d])} datasets")
+    print(f"    Sources: {len([1 for d in [sms_data, sa_data, custom_data] if d])} datasets")
     print(f"  {'='*45}")
 
     if not all_data:
