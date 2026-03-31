@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.env/
+
+# Downloaded data and generated outputs
+data/SMSSpamCollection.tsv
+data/smsspamcollection.zip
+data/spamassassin/
+outputs/*.png
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Streamlit config
+.streamlit/credentials.toml
