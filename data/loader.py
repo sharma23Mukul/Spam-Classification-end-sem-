@@ -80,13 +80,17 @@ def load_sms_data(filepath=None):
     return data
 
 
-def load_csv_directory(directory_path=None, limit_per_file=20000):
+def load_csv_directory(directory_path=None, limit_per_file=1000000):
     """
     Load all CSV files from a specific directory and automatically 
     parse their text and label columns.
     """
     import csv
     import glob
+    import sys
+    
+    # Increase CSV field size limit to handle abnormally massive emails
+    csv.field_size_limit(sys.maxsize)
 
     if directory_path is None:
         directory_path = os.path.join(
