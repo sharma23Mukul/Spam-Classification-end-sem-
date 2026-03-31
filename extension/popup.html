@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Spam Check</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      width: 320px;
+      padding: 16px;
+      margin: 0;
+      color: #333;
+    }
+    h2 { margin-top: 0; font-size: 18px; display: flex; align-items: center; gap: 8px;}
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.2s;
+    }
+    .btn:hover { background-color: #1557b0; }
+    .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+    
+    #result {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      display: none;
+      font-size: 14px;
+      border: 1px solid #ddd;
+    }
+    .spam { background-color: #fce8e6; border-color: #d93025; color: #a50e0e; }
+    .ham { background-color: #e6f4ea; border-color: #1e8e3e; color: #0d652d; }
+    .uncertain { background-color: #fef7e0; border-color: #fbbc04; color: #b08d00; }
+    
+    .loading { text-align: center; display: none; margin-top: 10px;}
+    .metrics { font-size: 12px; margin-top: 8px; color: #555;}
+    .error { color: #d93025; font-size: 13px; margin-top: 10px; display: none;}
+  </style>
+</head>
+<body>
+  <h2>📧 Gmail Spam Checker</h2>
+  <p style="font-size: 13px; color: #666; margin-bottom: 16px;">
+    Click to analyze the current open email using the local Naïve Bayes AI model.
+  </p>
+  
+  <button id="checkBtn" class="btn">Analyze Current Email</button>
+  <div id="loading" class="loading">Loading model predictions...</div>
+  <div id="error" class="error"></div>
+  
+  <div id="result">
+    <strong id="pred-badge" style="font-size: 16px;"></strong>
+    <div class="metrics" id="metricsbox"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
