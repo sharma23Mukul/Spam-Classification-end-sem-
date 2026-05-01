@@ -49,9 +49,9 @@ def load_saved_model():
     with open(MODEL_PATH, "rb") as f:
         bundle = pickle.load(f)
         loaded_model = bundle["model"]
-        print(f"✅ Model loaded successfully from {MODEL_PATH}!")
-        print(f"   Vocabulary Size: {bundle['vocabulary_size']}")
-        print(f"   Messages trained on: {bundle['total_messages_trained']}")
+        print(f"[v] Model loaded successfully from {MODEL_PATH}!")
+        print(f"    Vocabulary Size: {bundle['vocabulary_size']}")
+        print(f"    Messages trained on: {bundle['total_messages_trained']}")
 
 
 # ─── API Endpoints ─────────────────────────────────────────────────

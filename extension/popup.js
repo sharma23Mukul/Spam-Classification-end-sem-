@@ -1,17 +1,34 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const checkBtn = document.getElementById('checkBtn');
-  const resultDiv = document.getElementById('result');
+  const resultCard = document.getElementById('result-card');
   const predBadge = document.getElementById('pred-badge');
-  const metricsBox = document.getElementById('metricsbox');
+  const confVal = document.getElementById('conf-val');
+  const spamProb = document.getElementById('spam-prob');
+  const explanationText = document.getElementById('explanation-text');
   const loading = document.getElementById('loading');
   const errorMsg = document.getElementById('error');
+  const thresholdSlider = document.getElementById('threshold-slider');
+  const thresholdVal = document.getElementById('threshold-val');
 
   // Ensure FastAPI server URL is correct
   const API_URL = "https://spam-classification-end-sem.onrender.com/predict";
 
+  // Load saved threshold
+  const settings = await chrome.storage.local.get(['hamThreshold']);
+  if (settings.hamThreshold) {
+    thresholdSlider.value = settings.hamThreshold;
+    thresholdVal.innerText = settings.hamThreshold;
+  }
+
+  // Update threshold UI and save
+  thresholdSlider.addEventListener('input', (e) => {
+    thresholdVal.innerText = e.target.value;
+    chrome.storage.local.set({ hamThreshold: parseFloat(e.target.value) });
+  });
+
   checkBtn.addEventListener('click', async () => {
     // Reset UI
-    resultDiv.style.display = 'none';
+    resultCard.style.display = 'none';
     errorMsg.style.display = 'none';
     loading.style.display = 'block';
     checkBtn.disabled = true;
@@ -29,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const emailText = results[0]?.result;
 
       if (!emailText || emailText.trim().length === 0) {
-        throw new Error("Could not detect any email text. Please open an email in Gmail.");
+        throw new Error("No email text detected. Open a Gmail message first.");
       }
 
       // 3. Send text to local FastAPI endpoint
@@ -38,48 +55,51 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ message: emailText })
+        body: JSON.stringify({ 
+          message: emailText,
+          decision_threshold: parseFloat(thresholdSlider.value)
+        })
       });
 
-      if (!response.ok) {
-        throw new Error(`API Error: Is the FastAPI server running on port 8000?`);
+      let data;
+      const responseText = await response.text();
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Failed to parse JSON response:", responseText);
+        throw new Error(`Invalid API Response (Code ${response.status}). The server might be starting up or experiencing an issue.`);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || `API Error: ${response.status}`);
+      }
 
       // 4. Update UI with results
       loading.style.display = 'none';
-      resultDiv.style.display = 'block';
+      resultCard.style.display = 'block';
 
-      // Strip previous classes
-      resultDiv.className = '';
+      // Clear previous classes
+      predBadge.className = 'badge';
 
       if (data.prediction === 'spam') {
-        resultDiv.classList.add('spam');
-        predBadge.innerText = '🔴 SPAM DETECTED';
+        predBadge.classList.add('spam');
+        predBadge.innerText = '🔴 Spam Detected';
       } else if (data.prediction === 'ham') {
-        resultDiv.classList.add('ham');
-        predBadge.innerText = '🟢 SAFE (HAM)';
+        predBadge.classList.add('ham');
+        predBadge.innerText = '🟢 Legitimate';
       } else {
-        resultDiv.classList.add('uncertain');
-        predBadge.innerText = '⚠️ UNCERTAIN';
+        predBadge.classList.add('uncertain');
+        predBadge.innerText = '⚠️ Uncertain';
       }
 
-      let confPercent = (data.confidence * 100).toFixed(1);
-      metricsBox.innerHTML = `
-        <div style="margin-top: 5px;"><strong>Confidence:</strong> ${confPercent}%</div>
-        <div style="margin-top: 3px; color: #666; font-style: italic;">
-          P(Spam) = ${data.probabilities.spam.toFixed(4)}<br>
-          P(Ham) = ${data.probabilities.ham.toFixed(4)}
-        </div>
-        <div style="margin-top: 5px; font-size: 11px;">
-          ${data.explanation}
-        </div>
-      `;
+      confVal.innerText = (data.confidence * 100).toFixed(1) + '%';
+      spamProb.innerText = data.probabilities.spam.toFixed(3);
+      explanationText.innerText = data.explanation;
 
     } catch (err) {
       loading.style.display = 'none';
-      errorMsg.innerText = err.message;
+      errorMsg.innerText = "Error: " + err.message;
       errorMsg.style.display = 'block';
     } finally {
       checkBtn.disabled = false;
@@ -89,15 +109,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // This function is executed INSIDE the Gmail webpage context
 function extractEmailText() {
-  // Gmail typically puts the email body inside elements with class 'a3s' or 'ii gt'
-  // Or if it's an open thread, it tries to grab the visible text.
   const emailBodies = document.querySelectorAll('.a3s.aiL');
-
   if (emailBodies.length > 0) {
-    // Get the last one (usually the most recent email in the thread)
     return emailBodies[emailBodies.length - 1].innerText;
   }
-
-  // Fallback: grab all text on the page (messy but works as a fallback)
   return window.getSelection().toString() || document.body.innerText.substring(0, 5000);
 }
