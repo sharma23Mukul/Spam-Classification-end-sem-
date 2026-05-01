@@ -67,7 +67,7 @@ class PredictionResponse(BaseModel):
     explanation: str
     probabilities: dict
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     """Health check endpoint."""
     return {"status": "online", "model": "Multinomial Naïve Bayes"}
