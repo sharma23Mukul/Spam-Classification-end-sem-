@@ -23,3 +23,5 @@ Thumbs.db
 data/kaggle_emails.csv
 data/custom_datasets/*.csv
 data/custom_datasets/*.csv
+
+*.bak
