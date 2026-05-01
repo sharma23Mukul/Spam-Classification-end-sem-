@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 import plotly.graph_objects as go
+import pandas as pd
 
 from download_data import download_dataset
 from data.loader import load_all_data, train_val_test_split
@@ -114,6 +115,46 @@ def plot_pr_curve(metrics_m, metrics_b):
     return fig
 
 
+def plot_model_comparison_bar(m, b, g):
+    fig = go.Figure()
+    
+    models = ['Multinomial', 'Bernoulli', 'Gaussian']
+    accs = [m['accuracy']*100, b['accuracy']*100, g['accuracy']*100]
+    colors = ['rgba(192, 132, 252, 0.4)', 'rgba(52, 211, 153, 0.4)', 'rgba(148, 163, 184, 0.4)']
+    
+    fig.add_trace(go.Bar(
+        x=accs,
+        y=models,
+        orientation='h',
+        marker=dict(
+            color=colors,
+            line=dict(color='rgba(255,255,255,0.2)', width=1.5),
+            pattern=dict(shape="/", solidity=0.05) # Subtle glass texture
+        ),
+        text=[f"{a:.1f}%" for a in accs],
+        textposition='inside',
+        insidetextfont=dict(size=14, color='white', family="Inter, sans-serif"),
+    ))
+    
+    fig.update_layout(
+        plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#E2E8F0', size=11, family="Outfit, sans-serif"),
+        xaxis=dict(title="Accuracy (%)", range=[0, 100], gridcolor='rgba(255,255,255,0.05)', showline=False, zeroline=False),
+        yaxis=dict(showline=False, zeroline=False),
+        margin=dict(l=40, r=40, t=50, b=30), height=240, # Shrunk to fit
+        showlegend=False,
+        title=dict(
+            text="MODEL PERFORMANCE BENCHMARK", 
+            font=dict(size=12, color='#94A3B8', family="Outfit, sans-serif"), 
+            x=0.5, y=0.98
+        ),
+        bargap=0.3
+    )
+    # Rounded corners trick for older Plotly (if cornerradius fails)
+    fig.update_traces(marker_cornerradius=15) 
+    return fig
+
+
 def main():
     try:
         current_tab = st.query_params.get("tab", "comparison")
@@ -125,17 +166,39 @@ def main():
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
-        .stApp { background-color: #0E0E11; color: #F4F4F5; font-family: 'Inter', sans-serif; }
+        .stApp { background-color: #09090B; color: #F4F4F5; font-family: 'Inter', sans-serif; }
         header {visibility: hidden;} footer {visibility: hidden;}
-        .block-container { padding-top: 0rem !important; padding-left: 2rem !important; padding-right: 2rem !important; max-width: 1400px !important; }
+        .block-container { padding-top: 5rem !important; padding-left: 2rem !important; padding-right: 2rem !important; max-width: 1400px !important; }
 
-        .top-nav { display: flex; align-items: center; padding: 1.2rem 2rem; background-color: #0E0E11; border-bottom: 1px solid #27272A; margin-left: -2rem; margin-right: -2rem; margin-bottom: 2rem; }
+        .top-nav { 
+            position: fixed; top: 0; left: 0; width: 100vw; z-index: 1000;
+            display: flex; align-items: center; padding: 1rem 3rem; 
+            background: rgba(14, 14, 17, 0.6); 
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08); 
+        }
         .nav-logo { font-weight: 800; font-size: 1.1rem; color: #F4F4F5; display: flex; align-items: center; margin-right: 3rem; }
         .nav-logo span { color: #A855F7; margin-right: 10px; font-size: 1.4rem; }
-        .nav-links { display: flex; gap: 2rem; flex-grow: 1; }
-        .nav-link { color: #A1A1AA; font-size: 0.9rem; font-weight: 500; text-decoration: none; transition: color 0.2s; }
-        .nav-link:hover { color: #F4F4F5; }
-        .nav-link.active { color: #F4F4F5; border-bottom: 2px solid #8B5CF6; padding-bottom: 1.2rem; margin-bottom: -1.2rem;}
+        .nav-links { display: flex; gap: 1rem; flex-grow: 1; }
+        .nav-link { 
+            color: #A1A1AA; font-size: 0.85rem; font-weight: 600; text-decoration: none; 
+            padding: 8px 18px; border-radius: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.2s ease;
+        }
+        .nav-link:hover { 
+            color: #F4F4F5; 
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+        .nav-link.active { 
+            color: #FFFFFF; 
+            background: rgba(139, 92, 246, 0.15); 
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2);
+        }
         .nav-search { background-color: #18181B; border: 1px solid #27272A; border-radius: 6px; padding: 6px 12px; color: #A1A1AA; font-size: 0.85rem; margin-right: 2rem; display: flex; align-items: center; }
         .nav-status { display: flex; flex-direction: column; align-items: flex-end; }
         .status-title { font-size: 0.75rem; color: #F4F4F5; font-weight: 600; }
@@ -150,9 +213,20 @@ def main():
         div[data-testid="stButton"] button {
             border: 1px solid #3F3F46; background-color: transparent; color: #F4F4F5;
             padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        div[data-testid="stButton"] button:hover {
+            border-color: #A1A1AA;
+            color: #FFFFFF;
         }
         div[data-testid="stButton"] button[kind="primary"] {
             background-color: #8B5CF6; border: none; color: #FFFFFF; font-weight: 600;
+        }
+        div[data-testid="stButton"] button[kind="primary"]:hover {
+            background-color: #A855F7;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
         }
 
         .dark-card { background-color: #18181B; border: 1px solid #27272A; border-radius: 16px; padding: 20px; }
@@ -191,7 +265,126 @@ def main():
         .chart-title h4 { margin: 0; color: #F4F4F5; font-size: 0.95rem; font-weight: 600; }
         .chart-badge { background-color: #27272A; color: #A1A1AA; font-size: 0.7rem; padding: 4px 8px; border-radius: 6px; font-family: monospace; }
         
-        .textarea-box textarea { background-color: #18181B; border: 1px solid #27272A; color: #F4F4F5; }
+        /* Text Area Styling */
+        div[data-testid="stTextArea"] textarea { 
+            background-color: rgba(24, 24, 27, 0.7) !important; 
+            backdrop-filter: blur(10px);
+            border: 1px solid #3F3F46 !important; 
+            color: #F4F4F5 !important; 
+            border-radius: 16px !important; 
+            padding: 20px !important; 
+            font-size: 0.95rem !important;
+            line-height: 1.5 !important;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2) !important;
+            transition: all 0.3s ease !important;
+        }
+        div[data-testid="stTextArea"] textarea:focus { 
+            border-color: #8B5CF6 !important; 
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.2), 0 0 15px rgba(139, 92, 246, 0.3) !important; 
+        }
+        
+        .dashed-chart-container [data-testid="stPlotlyChart"] {
+            background: rgba(255, 255, 255, 0.03) !important;
+            backdrop-filter: blur(12px) !important;
+            -webkit-backdrop-filter: blur(12px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-style: dashed !important;
+            border-radius: 20px !important;
+            padding: 20px !important;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
+        }
+
+        /* Completely Hide Scrollbars but keep functionality */
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Ensure content is reachable but UI feels fixed on large screens */
+        html, body {
+            background-color: #09090B !important;
+        }
+        
+        [data-testid="stAppViewBlockContainer"] {
+            padding-top: 4.5rem !important;
+            padding-bottom: 1rem !important;
+            max-width: 1400px;
+        }
+        
+        /* Glass Pill Progress Bars */
+        .glass-pill-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50px;
+            height: 40px;
+            position: relative;
+            margin-bottom: 20px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            padding: 4px;
+        }
+        .pill-fill {
+            height: 100%;
+            border-radius: 50px;
+            background: linear-gradient(90deg, #7C3AED 0%, #DB2777 40%, #EA580C 70%, #CA8A04 100%);
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+            transition: width 1s ease-in-out;
+        }
+        .pill-label {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255,255,255,0.4);
+            font-weight: 800;
+            font-size: 0.65rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .pill-value {
+            position: absolute;
+            right: 25px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-weight: 900;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .scanning-bar {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #A855F7, #8B5CF6, #A855F7, transparent);
+            box-shadow: 0 0 20px #8B5CF6;
+            animation: scan 2s linear infinite;
+            z-index: 100;
+            pointer-events: none;
+        }
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 5px rgba(139, 92, 246, 0); }
+            50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.4); border-color: #8B5CF6; }
+            100% { box-shadow: 0 0 5px rgba(139, 92, 246, 0); }
+        }
+        .processing-glow {
+            animation: pulse-glow 1.5s infinite;
+        }
+        .result-fade-in {
+            animation: fadeIn 0.8s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -228,7 +421,7 @@ def main():
 
     if current_tab == "comparison":
         # Header Section with functioning Streamlit buttons inside columns
-        h_col1, h_col2 = st.columns([3, 1])
+        h_col1, h_col2 = st.columns([2.5, 1.2])
         with h_col1:
             st.markdown("""
             <div>
@@ -237,7 +430,8 @@ def main():
             </div>
             """, unsafe_allow_html=True)
         with h_col2:
-            btn_c1, btn_c2 = st.columns([1, 1.2])
+            st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
+            btn_c1, btn_c2 = st.columns([1, 1])
             with btn_c1:
                 if st.button("⚙️ Hyperparameters", use_container_width=True):
                     st.toast("Hyperparameters tuning window not implemented yet.", icon="⚙️")
@@ -293,13 +487,24 @@ def main():
 </div>
 """, unsafe_allow_html=True)
 
-            # Metric Cards
+            # Metric Cards — deltas computed from Multinomial vs Bernoulli baseline
+            prec_delta = m['precision'] - b['precision']
+            rec_delta = m['recall'] - b['recall']
+            f1_delta = m['f1_score'] - b['f1_score']
+            acc_delta = (m['accuracy'] - b['accuracy']) * 100
+            
+            def trend_html(delta, fmt=".3f"):
+                if delta >= 0:
+                    return f'<div class="mc-trend-g">↗ +{delta:{fmt}}</div>'
+                else:
+                    return f'<div class="mc-trend-r">↘ {delta:{fmt}}</div>'
+            
             st.markdown(f"""
 <div class="metric-grid">
     <div class="metric-card">
         <div class="mc-top">
             <div class="mc-icon">⌖</div>
-            <div class="mc-trend-g">↗ +0.012</div>
+            {trend_html(prec_delta)}
         </div>
         <div>
             <div class="mc-value">{m['precision']:.3f}</div>
@@ -309,7 +514,7 @@ def main():
     <div class="metric-card">
         <div class="mc-top">
             <div class="mc-icon">👁</div>
-            <div class="mc-trend-r">↘ -0.004</div>
+            {trend_html(rec_delta)}
         </div>
         <div>
             <div class="mc-value">{m['recall']:.3f}</div>
@@ -319,7 +524,7 @@ def main():
     <div class="metric-card">
         <div class="mc-top">
             <div class="mc-icon">📈</div>
-            <div class="mc-trend-g">↗ +0.008</div>
+            {trend_html(f1_delta)}
         </div>
         <div>
             <div class="mc-value">{m['f1_score']:.3f}</div>
@@ -329,7 +534,7 @@ def main():
     <div class="metric-card">
         <div class="mc-top">
             <div class="mc-icon">🎯</div>
-            <div class="mc-trend-g">↗ +1.2%</div>
+            {trend_html(acc_delta, '.1f')}
         </div>
         <div>
             <div class="mc-value">{m['accuracy']*100:.1f}%</div>
@@ -381,12 +586,14 @@ def main():
 
     elif current_tab == "predictor":
         st.markdown("<div class='header-title'>Live Predictor Sandbox</div>", unsafe_allow_html=True)
-        st.markdown("<div class='header-desc' style='margin-bottom: 2rem;'>Test the Champion model dynamically.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='header-desc' style='margin-bottom: 1rem;'>Test the Champion model dynamically.</div>", unsafe_allow_html=True)
         
-        pcol1, pcol2 = st.columns([2, 1])
+        pcol1, pcol2 = st.columns([1.2, 2])
         with pcol1:
-            st.markdown('<div class="dark-card textarea-box"><h4 style="margin-top: 0;">Input Text Sequence</h4>', unsafe_allow_html=True)
-            message = st.text_area("Message", height=150, label_visibility="collapsed", placeholder="Enter email or message text here to test the Champion model...")
+            st.markdown('<h4 style="color: #F4F4F5; margin-bottom: 12px; margin-top: 0; font-weight: 600; display: flex; align-items: center; gap: 8px;"><span>✉️</span> Input Text Sequence</h4>', unsafe_allow_html=True)
+            
+            default_msg = "URGENT: Your account has been accessed from a new IP address. Please verify your identity immediately at http://secure-verify-auth.com to prevent permanent suspension."
+            message = st.text_area("Message", value=default_msg, height=200, label_visibility="collapsed", placeholder="Enter email or message text here to test the Champion model...")
             
             with st.expander("⚙️ Decision Threshold Settings"):
                 manual_override = st.checkbox("Override Developer Default Threshold", value=False)
@@ -401,36 +608,117 @@ def main():
                     st.info(f"Using Developer Default Threshold: **{ham_threshold}**")
             
             predict_btn = st.button("▶ Run Inference Pipeline", type="primary", use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        with pcol2:
-            st.markdown('<div class="dark-card" style="min-height: 250px;"><h4 style="margin-top: 0;">Inference Results</h4>', unsafe_allow_html=True)
             
             if predict_btn and message:
+                st.markdown('<div class="scanning-bar" style="position: relative; top: -10px; border-radius: 4px;"></div>', unsafe_allow_html=True)
+            
+        with pcol2:
+            result_placeholder = st.empty()
+            
+            if not predict_btn or not message:
+                with result_placeholder.container():
+                    initial_html = '''<div class="dark-card" style="top: 67px; position: relative; border-style: dashed; border-color: #3F3F46; padding: 25px;">
+<h4 style="margin-top: 0; color: #71717A;">🛡️ BayesGuard Intelligence Overview</h4>
+<div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <div style="background: rgba(39, 39, 42, 0.3); padding: 20px; border-radius: 12px; border: 1px solid #27272A;">
+        <div style="font-size: 0.7rem; color: #A855F7; font-weight: 800; letter-spacing: 1px; margin-bottom: 10px;">ACTIVE ENSEMBLE</div>
+        <div style="font-size: 0.85rem; color: #F4F4F5; font-weight: 600; margin-bottom: 5px;">3-Model Voting Logic</div>
+        <p style="font-size: 0.75rem; color: #71717A; line-height: 1.5;">Our pipeline cross-references message signals across three different statistical variants to ensure maximum precision.</p>
+    </div>
+    <div style="background: rgba(39, 39, 42, 0.3); padding: 20px; border-radius: 12px; border: 1px solid #27272A;">
+        <div style="font-size: 0.7rem; color: #10B981; font-weight: 800; letter-spacing: 1px; margin-bottom: 10px;">SYSTEM STATUS</div>
+        <div style="font-size: 0.85rem; color: #F4F4F5; font-weight: 600; margin-bottom: 5px;">Production Ready</div>
+        <p style="font-size: 0.75rem; color: #71717A; line-height: 1.5;">The Champion model is serving live requests with high ROC-AUC metrics established on clean datasets.</p>
+    </div>
+</div>
+<div style="margin-top: 30px; border-top: 1px solid #27272A; padding-top: 20px;">
+    <div style="font-size: 0.75rem; color: #A1A1AA; font-weight: 500; text-align: center; opacity: 0.5;">[ Awaiting Inference Signal to Display Analysis ]</div>
+</div>
+</div>'''
+                    st.markdown(initial_html, unsafe_allow_html=True)
+            
+            if predict_btn and message:
+                # 1. Processing State (Dashed Box with Spinner)
+                result_placeholder.markdown('''
+                    <div class="dark-card" style="top: 67px; position: relative; min-height: 280px; border-style: dashed; border-color: #3F3F46; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px;">
+                        <div style="width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.05); border-top: 4px solid #8B5CF6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <h5 style="color: #A855F7; margin-top: 15px; font-weight: 600; letter-spacing: 2px; font-size: 0.9rem;">ANALYZING ENSEMBLE...</h5>
+                    </div>
+                    <style> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>
+                ''', unsafe_allow_html=True)
+                
+                import time
+                time.sleep(1.2)
+                
                 tokens = preprocess(message)
                 if not tokens:
-                    st.warning("Insufficient tokens for prediction.")
+                    result_placeholder.warning("Insufficient tokens for prediction.")
                 else:
-                    model = state['multinomial']
-                    result = model.predict_with_confidence(
-                        tokens, 
-                        confidence_threshold=0.70,
-                        decision_threshold=ham_threshold
-                    )
-                    pred = result['prediction']
+                    # Run all 3 models
+                    models = {
+                        'Multinomial': state['multinomial'],
+                        'Bernoulli': state['bernoulli'],
+                        'Gaussian': state['gaussian']
+                    }
+                    results = {}
+                    for name, model in models.items():
+                        results[name] = model.predict_with_confidence(
+                            tokens, 
+                            confidence_threshold=0.70,
+                            decision_threshold=ham_threshold
+                        )
                     
-                    if pred == 'spam':
-                        st.markdown('<div style="background-color: rgba(239, 68, 68, 0.1); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 16px; border-radius: 8px; text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 20px;">SPAM DETECTED</div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown('<div style="background-color: rgba(16, 185, 129, 0.1); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 16px; border-radius: 8px; text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 20px;">LEGITIMATE (HAM)</div>', unsafe_allow_html=True)
-                    
-                    st.markdown(f"**Confidence Score:** {result['confidence']:.2%}")
-                    st.progress(result['confidence'])
-                    st.markdown("**Token Analysis:**")
-                    st.code(str(tokens))
-            else:
-                st.info("Awaiting input sequence...")
-            st.markdown("</div>", unsafe_allow_html=True)
+                    # 2. Final Result State (Custom Glass Pill Bars inside Dashed Box)
+                    with result_placeholder.container():
+                        models_data = [
+                            ("Multinomial", state['metrics_multi']['accuracy'] * 100),
+                            ("Bernoulli", state['metrics_bern']['accuracy'] * 100),
+                            ("Gaussian", state['metrics_gauss']['accuracy'] * 100)
+                        ]
+                        
+                        preds = [r['prediction'] for r in results.values()]
+                        is_unanimous = len(set(preds)) == 1
+                        consensus_color = "#34D399" if is_unanimous else "#FBBF24"
+                        consensus_text = "TOTAL AGREEMENT" if is_unanimous else "MODEL DIVERGENCE"
+                        
+                        html_content = f'''<div class="dark-card" style="top: 67px; position: relative; min-height: 280px; border-style: dashed; border-color: #3F3F46; padding: 30px;">
+<div style="font-size: 0.7rem; color: #71717A; font-weight: 800; letter-spacing: 2px; text-align: center; margin-bottom: 25px;">MODEL ACCURACY BENCHMARK</div>'''
+                        
+                        for name, acc in models_data:
+                            html_content += f'''
+<div class="glass-pill-container">
+    <div class="pill-label">{name}</div>
+    <div class="pill-fill" style="width: {acc}%;"></div>
+    <div class="pill-value">{acc:.1f}%</div>
+</div>'''
+                            
+                        html_content += f'''
+<div style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 25px;"></div>
+<div style="background: rgba(139, 92, 246, 0.02); border: 1px solid rgba(139, 92, 246, 0.1); padding: 20px; border-radius: 15px;">
+    <h4 style="margin-top: 0; display: flex; justify-content: space-between; font-size: 0.9rem; color: #E2E8F0; opacity: 0.8;">Live Ensemble Verdict <span style="font-size: 0.6rem; color: #A855F7; background: rgba(139,92,246,0.1); padding: 4px 10px; border-radius: 4px; letter-spacing: 1px; font-weight: 800;">REAL-TIME</span></h4>
+    <div style="background: rgba(0, 0, 0, 0.2); padding: 12px 18px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.05);">
+        <div style="font-size: 0.7rem; color: #94A3B8; font-weight: 700; letter-spacing: 1px;">CONSENSUS:</div>
+        <div style="color: {consensus_color}; font-weight: 800; font-size: 0.75rem; letter-spacing: 1.5px;">{consensus_text}</div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">'''
+                        
+                        model_names = ['Multinomial', 'Bernoulli', 'Gaussian']
+                        for name in model_names:
+                            res = results[name]
+                            color = "#F87171" if res['prediction'] == 'spam' else "#34D399" if res['prediction'] == 'ham' else "#94A3B8"
+                            html_content += f'''
+        <div style="background: rgba(0,0,0,0.2); border: 1px solid {color}33; padding: 12px; border-radius: 12px; text-align: center;">
+            <div style="font-size: 0.55rem; font-weight: 800; color: {color}; letter-spacing: 1px; margin-bottom: 4px;">{name.upper()}</div>
+            <div style="font-size: 1rem; font-weight: 900; color: {color}; letter-spacing: 0.5px;">{res['prediction'].upper()}</div>
+            <div style="font-size: 0.65rem; color: #64748B; margin-top: 4px; font-weight: 600;">{res['confidence']:.0%} Conf.</div>
+        </div>'''
+                            
+                        html_content += '''
+    </div>
+</div>
+</div>'''
+                        
+                        st.markdown(html_content, unsafe_allow_html=True)
 
     elif current_tab == "analytics":
         st.markdown("<div class='header-title'>Analytics Vault</div>", unsafe_allow_html=True)
@@ -452,37 +740,49 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown('<div class="dark-card" style="height: 100%;"><h4 style="margin-top: 0;">Dataset Composition</h4>', unsafe_allow_html=True)
+            st.markdown('<h4 style="color: #F4F4F5; margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid #27272A; margin-bottom: 20px;">Dataset Composition</h4>', unsafe_allow_html=True)
             total_spam = multi.class_word_counts.get('spam', 0)
             total_ham = multi.class_word_counts.get('ham', 0)
             fig = go.Figure(data=[go.Pie(labels=['Ham', 'Spam'], values=[total_ham, total_spam], hole=.6, marker_colors=['#10B981', '#EF4444'])])
             fig.update_layout(margin=dict(t=20, b=20, l=20, r=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#A1A1AA'), showlegend=True, height=250)
             st.plotly_chart(fig, use_container_width=True)
-            st.markdown(f"<div style='text-align: center; color: #A1A1AA;'>Total Vocabulary Size: <b>{vocab_size:,}</b> unique words</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align: center; color: #A1A1AA; margin-top: 10px;'>Total Vocabulary Size: <b>{vocab_size:,}</b> unique words</div>", unsafe_allow_html=True)
             
         with col2:
-            st.markdown('<div class="dark-card" style="height: 100%;"><h4 style="margin-top: 0;">Top Predictive Features</h4>', unsafe_allow_html=True)
-            tcol1, tcol2 = st.columns(2)
-            with tcol1:
-                st.markdown("<div style='color: #EF4444; font-weight: bold; margin-bottom: 10px;'>Spam Indicators</div>", unsafe_allow_html=True)
-                for w, score in word_scores[:10]:
-                    st.markdown(f"<div style='display: flex; justify-content: space-between; border-bottom: 1px solid #27272A; padding: 4px 0;'><span style='color: #F4F4F5;'>{w}</span> <span style='color: #71717A; font-family: monospace;'>+{score:.2f}</span></div>", unsafe_allow_html=True)
-            with tcol2:
-                st.markdown("<div style='color: #10B981; font-weight: bold; margin-bottom: 10px;'>Ham Indicators</div>", unsafe_allow_html=True)
-                for w, score in reversed(word_scores[-10:]):
-                    st.markdown(f"<div style='display: flex; justify-content: space-between; border-bottom: 1px solid #27272A; padding: 4px 0;'><span style='color: #F4F4F5;'>{w}</span> <span style='color: #71717A; font-family: monospace;'>{score:.2f}</span></div>", unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            html_content = '''<div class="dark-card" style="height: 100%;">
+<h4 style="margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid #27272A; margin-bottom: 20px;">Top Predictive Features</h4>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <div>
+        <div style="color: #EF4444; font-weight: bold; margin-bottom: 10px;">Spam Indicators</div>'''
+            for w, score in word_scores[:10]:
+                html_content += f"<div style='display: flex; justify-content: space-between; border-bottom: 1px solid #27272A; padding: 4px 0;'><span style='color: #F4F4F5;'>{w}</span> <span style='color: #71717A; font-family: monospace;'>+{score:.2f}</span></div>"
+            html_content += '''
+    </div>
+    <div>
+        <div style="color: #10B981; font-weight: bold; margin-bottom: 10px;">Ham Indicators</div>'''
+            for w, score in reversed(word_scores[-10:]):
+                html_content += f"<div style='display: flex; justify-content: space-between; border-bottom: 1px solid #27272A; padding: 4px 0;'><span style='color: #F4F4F5;'>{w}</span> <span style='color: #71717A; font-family: monospace;'>{score:.2f}</span></div>"
+            html_content += '''
+    </div>
+</div>
+</div>'''
+            st.markdown(html_content, unsafe_allow_html=True)
 
-        st.markdown("<div class='dark-card' style='margin-top: 2rem;'><h4 style='margin-top: 0;'>Structural Patterns (Message Length)</h4>", unsafe_allow_html=True)
-        acol1, acol2 = st.columns(2)
+        st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
+        st.markdown('<h4 style="color: #F4F4F5; margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid #27272A; margin-bottom: 20px;">Structural Patterns (Message Length)</h4>', unsafe_allow_html=True)
+        
+        acol1, acol2 = st.columns([1.5, 1])
         with acol1:
             st.info("**Pattern Identified:** In this dataset, **Spam messages are generally LONGER** than Ham messages.")
             st.markdown("""
-            * **Average Ham:** ~500 chars (median 155)
-            * **Average Spam:** ~1,000+ chars (median 1,500)
-            
-            This occurs because marketing emails (labeled as spam) are often long and verbose, while corporate ham (Enron) is often short and direct.
-            """)
+            <div style="padding-left: 20px; color: #A1A1AA; font-size: 0.95rem; line-height: 1.6;">
+                <ul>
+                    <li style="margin-bottom: 10px;"><strong style="color: #10B981;">Average Ham:</strong> ~500 chars (median 155)</li>
+                    <li style="margin-bottom: 10px;"><strong style="color: #EF4444;">Average Spam:</strong> ~1,000+ chars (median 1,500)</li>
+                </ul>
+                <p style="margin-top: 15px;">This occurs because marketing emails (labeled as spam) are often long and verbose, while corporate ham (Enron) is often short and direct.</p>
+            </div>
+            """, unsafe_allow_html=True)
         with acol2:
             import plotly.express as px
             # Simple bar chart for median length
@@ -492,10 +792,9 @@ def main():
             })
             fig_len = px.bar(lengths, x='Class', y='Median Characters', color='Class', 
                            color_discrete_map={'Ham': '#10B981', 'Spam': '#EF4444'})
-            fig_len.update_layout(margin=dict(t=20, b=20, l=20, r=20), paper_bgcolor='rgba(0,0,0,0)', 
-                                plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#A1A1AA'), height=200, showlegend=False)
+            fig_len.update_layout(margin=dict(t=0, b=0, l=0, r=0), paper_bgcolor='rgba(0,0,0,0)', 
+                                plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#A1A1AA'), height=220, showlegend=False)
             st.plotly_chart(fig_len, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
     elif current_tab == "math":
         import math
@@ -532,7 +831,7 @@ def main():
             st.markdown("</div>", unsafe_allow_html=True)
             
         with col2:
-            st.markdown('<div class="dark-card textarea-box" style="height: 100%;">', unsafe_allow_html=True)
+            st.markdown('<div class="dark-card" style="height: 100%;">', unsafe_allow_html=True)
             st.markdown("#### Log-Likelihood Explorer $P(Word | Class)$")
             st.markdown("<span style='color: #A1A1AA; font-size: 0.9rem;'>Laplace Smoothing Applied: $\\alpha = " + str(alpha) + "$</span>", unsafe_allow_html=True)
             test_word = st.text_input("Enter a single word to trace its probability:", "free")
