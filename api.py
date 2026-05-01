@@ -58,6 +58,7 @@ def load_saved_model():
 
 class PredictionRequest(BaseModel):
     message: str
+    decision_threshold: float = 0.65  # Developer Default
 
 class PredictionResponse(BaseModel):
     prediction: str
@@ -100,7 +101,11 @@ def predict_spam(request: PredictionRequest):
 
     # 2. Feed the tokens into our custom Naïve Bayes model
     # We use a 70% confidence threshold to handle ambiguous/tricky texts
-    result = loaded_model.predict_with_confidence(tokens, confidence_threshold=0.70)
+    result = loaded_model.predict_with_confidence(
+        tokens, 
+        confidence_threshold=0.70,
+        decision_threshold=request.decision_threshold
+    )
 
     # 3. Return the JSON response
     return PredictionResponse(

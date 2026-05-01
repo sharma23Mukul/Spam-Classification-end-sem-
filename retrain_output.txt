@@ -1,0 +1,104 @@
+﻿
+==================================================
+  Model Persistence (Serialization)
+==================================================
+
+=======================================================
+  Downloading Datasets for Training
+=======================================================
+[OK] SMS dataset already exists at: C:\Users\hemas\Downloads\Probability Project\data\SMSSpamCollection.tsv
+[OK] SpamAssassin dataset already exists at: C:\Users\hemas\Downloads\Probability Project\data\spamassassin
+
+=======================================================
+  Dataset Download Summary
+=======================================================
+  SMS Spam Collection: Ready
+  SpamAssassin Corpus: Ready
+=======================================================
+
+[1/6] Loading all datasets...
+
+  Dataset 1: SMS Spam Collection
+    Total: 5574 messages
+    Spam: 747, Ham: 4827
+
+  Dataset 2: SpamAssassin Email Corpus
+    Total: 4554 emails
+    Spam: 1806, Ham: 2748
+
+  [>>] Found 1 custom CSV datasets in: custom_datasets/, parsing...
+      -> Parsing kaggle_emails.csv...
+
+  Dataset 3: Custom CSV Datasets
+    Total: 5572 emails
+    Spam/Promo: 747, Ham/Updt: 4825
+
+  =============================================
+  Combined Dataset Summary
+  =============================================
+    Total messages: 15700
+    Spam: 3300 (21.0%)
+    Ham:  12400 (79.0%)
+    Sources: 3 datasets
+  =============================================
+[2/6] Splitting data into train/test...
+
+  [OK] Split: 12560 train, 3140 test
+    Train - Spam: 2640, Ham: 9920
+    Test  - Spam: 660, Ham: 2480
+[3/6] Preprocessing and tokenizing corpus...
+[Γ£ô] Word frequencies computed
+    Spam vocabulary: 20815 unique words, 171124 total occurrences
+    Ham vocabulary:  27487 unique words, 236992 total occurrences
+[4/6] Training Multinomial Na├»ve Bayes...
+
+==================================================
+  MultinomialNaiveBayes ΓÇö Training
+==================================================
+  Prior Probabilities:
+    P( ham) = 9920/12560 = 0.7898
+    log P( ham) = -0.2360
+    P(spam) = 2640/12560 = 0.2102
+    log P(spam) = -1.5597
+  Vocabulary size |V| = 41677
+  Smoothing ╬▒ = 1.0
+  Likelihood computation (Multinomial):
+    Total words in spam: 171124
+    Total words in ham:  236992
+
+    Example: P('free' | spam)
+    = (count + ╬▒) / (N_spam + ╬▒ ├ù |V|)
+    = (1253 + 1.0) / (171124 + 1.0 ├ù 41677)
+    = 1254.0 / 212801.0
+    = 0.005893
+  [Γ£ô] Model trained successfully
+
+[5/6] Training Bernoulli Na├»ve Bayes...
+
+==================================================
+  BernoulliNaiveBayes ΓÇö Training
+==================================================
+  Prior Probabilities:
+    P( ham) = 9920/12560 = 0.7898
+    log P( ham) = -0.2360
+    P(spam) = 2640/12560 = 0.2102
+    log P(spam) = -1.5597
+  Vocabulary size |V| = 41677
+  Smoothing ╬▒ = 1.0
+  Likelihood computation (Bernoulli):
+    Spam documents: 2640
+    Ham documents:  9920
+
+    Example: P('free' present | spam)
+    = (doc_count + ╬▒) / (N_docs_spam + 2╬▒)
+    = (700 + 1.0) / (2640 + 2├ù1.0)
+    = 701.0 / 2642.0
+    = 0.265329
+    P('free' absent | spam) = 0.734671
+  [Γ£ô] Model trained successfully
+
+[6/6] Evaluating models and saving everything...
+
+[Γ£ô] API model saved! Size: 1.87 MB
+[Γ£ô] App bundle saved!  Size: 4.64 MB
+    You can now boot the Streamlit app or FastAPI server instantly.

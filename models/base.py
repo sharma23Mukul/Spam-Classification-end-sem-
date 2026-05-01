@@ -146,7 +146,7 @@ class NaiveBayesBase(ABC):
         """
         pass
 
-    def predict(self, tokens):
+    def predict(self, tokens, decision_threshold=0.5):
         """
         Classify a preprocessed message using Bayes' Theorem.
 
@@ -154,17 +154,20 @@ class NaiveBayesBase(ABC):
 
             log P(class | message) = log P(class) + Σ log P(word_i | class)
 
-        The class with the highest posterior wins.
-
         Parameters
         ----------
         tokens : list of str
             Preprocessed tokens of the message.
+        decision_threshold : float
+            The threshold for the 'ham' class.
+            If P(ham) > decision_threshold, predict 'ham'.
+            Otherwise, predict 'spam'.
+            Increasing this makes the model more conservative about labeling ham.
 
         Returns
         -------
         tuple
-            (predicted_label, probabilities_dict)
+            (predicted_class, probabilities_dict)
             where probabilities_dict = {'spam': P(spam|msg), 'ham': P(ham|msg)}
 
         Mathematical Detail:
@@ -187,18 +190,30 @@ class NaiveBayesBase(ABC):
             )
 
         # Convert log posteriors to probabilities using log-sum-exp trick
+        # TEMPERATURE SCALING FIX FOR NAIVE BAYES LENGTH BIAS OVERCONFIDENCE
+        # For long documents, Naive Bayes creates massive differences in log-posteriors,
+        # leading to 1.0 / 0.0 probabilities. We divide the log-posteriors by a temperature
+        # factor proportional to the sequence length to scale them back to a realistic range.
+        num_tokens = max(1, len(tokens))
+        T = max(1.0, num_tokens / 10.0)
+        
+        scaled_posteriors = {cls: lp / T for cls, lp in log_posteriors.items()}
+
         # This avoids numerical overflow when exponentiating
-        max_log = max(log_posteriors.values())
+        max_log = max(scaled_posteriors.values())
         log_sum = max_log + math.log(
-            sum(math.exp(lp - max_log) for lp in log_posteriors.values())
+            sum(math.exp(lp - max_log) for lp in scaled_posteriors.values())
         )
 
         probabilities = {}
         for cls in self.classes:
-            probabilities[cls] = math.exp(log_posteriors[cls] - log_sum)
+            probabilities[cls] = math.exp(scaled_posteriors[cls] - log_sum)
 
-        # The predicted class is the one with highest posterior probability
-        predicted = max(probabilities, key=probabilities.get)
+        # Apply custom decision threshold for 'ham'
+        if probabilities['ham'] > decision_threshold:
+            predicted = 'ham'
+        else:
+            predicted = 'spam'
 
         return predicted, probabilities
 
@@ -228,7 +243,7 @@ class NaiveBayesBase(ABC):
 
         return y_true, y_pred, probs_list
 
-    def predict_with_confidence(self, tokens, confidence_threshold=0.70):
+    def predict_with_confidence(self, tokens, confidence_threshold=0.70, decision_threshold=0.5):
         """
         Classify a message WITH confidence-based uncertainty detection.
 
@@ -276,7 +291,7 @@ class NaiveBayesBase(ABC):
         if not self._is_fitted:
             raise RuntimeError("Model not fitted. Call fit() first.")
 
-        pred, probs = self.predict(tokens)
+        pred, probs = self.predict(tokens, decision_threshold=decision_threshold)
         confidence = probs[pred]
         is_confident = confidence >= confidence_threshold
 

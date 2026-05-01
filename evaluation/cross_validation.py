@@ -26,7 +26,8 @@ Cross Validation Purpose:
 
 import random
 from preprocessing.pipeline import preprocess_corpus, build_vocabulary
-from evaluation.metrics import confusion_matrix, accuracy
+from evaluation.metrics import confusion_matrix, get_binary_labels
+from sklearn.metrics import accuracy_score
 
 
 def k_fold_split(data, k=5, seed=42):
@@ -162,7 +163,10 @@ def k_fold_cross_validation(data, model_class, k=5, alpha=1.0, seed=42):
 
         # Compute metrics
         cm = confusion_matrix(y_true, y_pred)
-        acc = accuracy(cm)
+        
+        y_true_bin = get_binary_labels(y_true)
+        y_pred_bin = get_binary_labels(y_pred)
+        acc = accuracy_score(y_true_bin, y_pred_bin)
 
         fold_accuracies.append(acc)
         fold_metrics.append(cm)

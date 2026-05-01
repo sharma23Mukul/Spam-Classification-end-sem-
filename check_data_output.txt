@@ -1,0 +1,58 @@
+﻿
+============================================================
+File: processed_data.csv (322.4 MB)
+============================================================
+Columns: ['label', 'subject', 'email_to', 'email_from', 'message']
+Text column: message
+Label column: label
+
+Total rows: 75419
+
+Raw label distribution:
+  '1': 50199 (66.6%)
+  '0': 25220 (33.4%)
+
+Binary label mapping:
+  spam: 50199 (66.6%)
+  ham: 25220 (33.4%)
+  skipped: 0 (0.0%)
+
+First 3 samples:
+  Row 1: label='1', text='Content-Type: text/html;
+Content-Transfer-Encoding: 7Bit Do you feel the pressure to perform and not rising to the occas'
+  Row 2: label='0', text='Hi, i've just updated from the gulus and I check on other mirrors.
+It seems there is a little typo in /debian/README fil'
+  Row 3: label='1', text='Content-Type: text/plain;
+	charset="iso-8859-1"
+Content-Transfer-Encoding: 7bit
+
+Mega  authenticV I A G R A   $ DISCOUNT'
+
+============================================================
+File: kaggle_emails.csv (0.5 MB)
+============================================================
+Columns: ['Category', 'Message']
+Text column: Message
+Label column: Category
+
+Total rows: 5572
+
+Raw label distribution:
+  'ham': 4825 (86.6%)
+  'spam': 747 (13.4%)
+
+Binary label mapping:
+  spam: 747 (13.4%)
+  ham: 4825 (86.6%)
+  skipped: 0 (0.0%)
+
+First 3 samples:
+  Row 1: label='ham', text='Go until jurong point, crazy.. Available only in bugis n great world la e buffet... Cine there got amore wat...'
+  Row 2: label='ham', text='Ok lar... Joking wif u oni...'
+  Row 3: label='spam', text='Free entry in 2 a wkly comp to win FA Cup final tkts 21st May 2005. Text FA to 87121 to receive entry question(std txt r'
+
+============================================================
+SMS Spam Collection
+============================================================
+Spam: 747, Ham: 4827, Total: 5574
+Spam ratio: 13.4%

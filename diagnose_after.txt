@@ -1,0 +1,63 @@
+﻿=== Bundle Info ===
+Total data: 15700
+Total train: 12560
+Total test: 3140
+Vocabulary size: 41677
+
+=== Multinomial Metrics ===
+  confusion_matrix: {'TP': 623, 'TN': 2441, 'FP': 39, 'FN': 37}
+  accuracy: 0.975796178343949
+  precision: 0.9410876132930514
+  recall: 0.943939393939394
+  f1_score: 0.9425113464447806
+
+=== Bernoulli Metrics ===
+  confusion_matrix: {'TP': 365, 'TN': 2409, 'FP': 71, 'FN': 295}
+  accuracy: 0.8834394904458599
+  precision: 0.8371559633027523
+  recall: 0.553030303030303
+  f1_score: 0.6660583941605839
+
+=== Prediction Tests (Multinomial) ===
+  [   OK] pred=     spam expected=spam P(spam)=0.9997 P(ham)=0.0003 | Congratulations! You won a free iPhone! Click here to c
+  [   OK] pred=      ham expected= ham P(spam)=0.0032 P(ham)=0.9968 | Hey, are you free for lunch tomorrow?
+  [   OK] pred=     spam expected=spam P(spam)=0.9891 P(ham)=0.0109 | URGENT: Your account has been compromised. Click here t
+  [   OK] pred=      ham expected= ham P(spam)=0.0003 P(ham)=0.9997 | Meeting at 3pm today in conference room B
+  [   OK] pred=     spam expected=spam P(spam)=0.9841 P(ham)=0.0159 | You have won a lottery worth 1 million dollars
+  [   OK] pred=      ham expected= ham P(spam)=0.0116 P(ham)=0.9884 | Can you pick up the kids from school today?
+  [   OK] pred=     spam expected=spam P(spam)=0.9951 P(ham)=0.0049 | Dear customer, your subscription renewal is pending. Cl
+  [   OK] pred=     spam expected=spam P(spam)=0.9970 P(ham)=0.0030 | Free entry to win a trip to Bahamas! Text WIN to 12345
+  [   OK] pred=      ham expected= ham P(spam)=0.0020 P(ham)=0.9980 | Hi mom, I will be home by 7pm
+  [   OK] pred=     spam expected=spam P(spam)=0.9644 P(ham)=0.0356 | Limited time offer! 50% off on all products!
+  Wrong: 0/10
+
+=== Prediction Tests (Bernoulli) ===
+  [WRONG] pred=      ham expected=spam P(spam)=0.0000 P(ham)=1.0000 | Congratulations! You won a free iPhone! Click here to c
+  [   OK] pred=      ham expected= ham P(spam)=0.0000 P(ham)=1.0000 | Hey, are you free for lunch tomorrow?
+  [WRONG] pred=      ham expected=spam P(spam)=0.0000 P(ham)=1.0000 | URGENT: Your account has been compromised. Click here t
+  [   OK] pred=      ham expected= ham P(spam)=0.0000 P(ham)=1.0000 | Meeting at 3pm today in conference room B
+  [WRONG] pred=      ham expected=spam P(spam)=0.0000 P(ham)=1.0000 | You have won a lottery worth 1 million dollars
+  [   OK] pred=      ham expected= ham P(spam)=0.0000 P(ham)=1.0000 | Can you pick up the kids from school today?
+  [WRONG] pred=      ham expected=spam P(spam)=0.0000 P(ham)=1.0000 | Dear customer, your subscription renewal is pending. Cl
+  [WRONG] pred=      ham expected=spam P(spam)=0.0000 P(ham)=1.0000 | Free entry to win a trip to Bahamas! Text WIN to 12345
+  [   OK] pred=      ham expected= ham P(spam)=0.0000 P(ham)=1.0000 | Hi mom, I will be home by 7pm
+  [WRONG] pred=      ham expected=spam P(spam)=0.0000 P(ham)=1.0000 | Limited time offer! 50% off on all products!
+  Wrong: 6/10
+
+=== Model Priors ===
+  P(ham) = 0.7898
+  P(spam) = 0.2102
+
+=== Vocab Sample (spam-indicative words) ===
+  'free': in_vocab=True
+  'win': in_vocab=True
+  'winner': in_vocab=True
+  'prize': in_vocab=True
+  'click': in_vocab=True
+  'call': in_vocab=True
+  'urgent': in_vocab=True
+  'congratulations': in_vocab=True
+  'offer': in_vocab=True
+  'cash': in_vocab=True
+  'claim': in_vocab=True
+  'lottery': in_vocab=True

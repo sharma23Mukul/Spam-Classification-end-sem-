@@ -29,14 +29,17 @@ from collections import Counter
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
 
 # Download required NLTK data (only on first run)
 nltk.download('punkt', quiet=True)
 nltk.download('punkt_tab', quiet=True)
 nltk.download('stopwords', quiet=True)
+nltk.download('wordnet', quiet=True)
 
 # Cache the stopwords set for efficiency
 STOP_WORDS = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
 
 
 def preprocess(text):
@@ -67,16 +70,20 @@ def preprocess(text):
     # Step 1: Convert to lowercase
     text = text.lower()
 
-    # Step 2: Remove punctuation and numbers
-    # Keep only alphabetic characters and spaces
-    text = re.sub(r'[^a-z\s]', '', text)
+    # Step 2: Handle URLs and Emails (replace with special tokens)
+    text = re.sub(r'http[s]?://\S+|www\.\S+', ' urltoken ', text)
+    text = re.sub(r'\S+@\S+', ' emailtoken ', text)
 
-    # Step 3: Tokenize — split text into individual words
+    # Step 3: Remove punctuation and numbers
+    # Keep only alphabetic characters and spaces
+    text = re.sub(r'[^a-z\s]', ' ', text)
+
+    # Step 4: Tokenize — split text into individual words
     tokens = word_tokenize(text)
 
-    # Step 4: Remove stopwords and very short tokens (length ≤ 1)
+    # Step 5: Remove stopwords, lemmatize, and filter short tokens
     tokens = [
-        token for token in tokens
+        lemmatizer.lemmatize(token) for token in tokens
         if token not in STOP_WORDS and len(token) > 1
     ]
 
@@ -111,9 +118,13 @@ def preprocess_corpus(data):
     return processed
 
 
-def build_vocabulary(processed_data):
+def build_vocabulary(processed_data, min_df=2, max_df=0.95):
     """
     Build a sorted vocabulary (set of unique words) from the preprocessed corpus.
+
+    Filters vocabulary based on Document Frequency (DF):
+        - min_df: minimum number of documents a word must appear in
+        - max_df: maximum proportion of documents a word can appear in
 
     The vocabulary size |V| is used in Laplace smoothing:
         P(word | class) = (count(word, class) + α) / (N_class + α × |V|)
@@ -122,15 +133,28 @@ def build_vocabulary(processed_data):
     ----------
     processed_data : list of tuple
         List of (label, tokens) tuples.
+    min_df : int
+        Minimum document frequency (remove rare words).
+    max_df : float
+        Maximum document frequency proportion (remove overly common words).
 
     Returns
     -------
     list of str
         Sorted list of unique words in the corpus.
     """
-    vocab = set()
+    doc_freq = Counter()
+    total_docs = len(processed_data)
+    
     for _, tokens in processed_data:
-        vocab.update(tokens)
+        doc_freq.update(set(tokens))
+        
+    vocab = set()
+    for word, count in doc_freq.items():
+        freq_prop = count / total_docs
+        if count >= min_df and freq_prop <= max_df:
+            vocab.add(word)
+            
     return sorted(vocab)
 
 

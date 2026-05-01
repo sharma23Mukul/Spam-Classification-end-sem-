@@ -32,6 +32,7 @@ Label Noise & Ambiguity:
 
 import os
 import random
+from sklearn.model_selection import train_test_split as sk_train_test_split
 
 
 def load_sms_data(filepath=None):
@@ -109,8 +110,8 @@ def load_csv_directory(directory_path=None, limit_per_file=1000000):
     data = []
     print(f"\n  [>>] Found {len(csv_files)} custom CSV datasets in: {os.path.basename(directory_path)}/, parsing...")
 
-    spam_classes = {'spam', 'promotion', 'promotional', 'phishing'}
-    ham_classes = {'ham', 'update', 'updates', 'primary', 'personal', 'social', 'notification'}
+    spam_classes = {'spam', 'promotion', 'promotional', 'promotions', 'phishing'}
+    ham_classes = {'ham', 'update', 'updates', 'primary', 'personal', 'social', 'notification', 'forum', 'verify_code', 'social_media'}
 
     for filepath in csv_files:
         filename = os.path.basename(filepath)
@@ -126,13 +127,14 @@ def load_csv_directory(directory_path=None, limit_per_file=1000000):
                 if not text_col or not label_col:
                     print(f"        [!!] Skipping {filename}: Missing clear 'text' or 'label' columns. Found: {reader.fieldnames}")
                     continue
-                    
+                        
                 count = 0
                 for row in reader:
                     if count >= limit_per_file:
                         break
                         
                     raw_label = str(row.get(label_col, '')).strip().lower()
+                        
                     text = str(row.get(text_col, '')).strip()
                     
                     if not text:
@@ -157,20 +159,16 @@ def load_csv_directory(directory_path=None, limit_per_file=1000000):
 
     return data
 
-def load_all_data():
+def load_all_data(exclusive_file=None):
     """
     Load and MERGE all available datasets into a single corpus.
 
-    This function:
-        1. Loads the SMS Spam Collection
-        2. Loads the SpamAssassin email corpus (if downloaded)
-        3. Merges them with source tracking
-        4. Reports dataset statistics
-
-    Combining multiple datasets is a form of DATA AUGMENTATION that:
-        - Increases the effective training size
-        - Diversifies the word distribution
-        - Reduces the variance of our probability estimates
+    Parameters
+    ----------
+    exclusive_file : str, optional
+        If provided, ONLY load this specific CSV file from custom_datasets/
+        and skip all other data sources (SMS, SpamAssassin, etc.).
+        This is useful for hit-and-trial retraining on a single dataset.
 
     Returns
     -------
@@ -178,6 +176,44 @@ def load_all_data():
         Each tuple is (label, message).
     """
     data_dir = os.path.dirname(os.path.abspath(__file__))
+
+    if exclusive_file:
+        # ─── Exclusive Mode: Train ONLY on the specified file ────
+        print(f"\n  [!] EXCLUSIVE MODE: Training ONLY on '{exclusive_file}'")
+        custom_dir = os.path.join(data_dir, "custom_datasets")
+        exclusive_path = os.path.join(custom_dir, exclusive_file)
+        if not os.path.exists(exclusive_path):
+            raise RuntimeError(f"Exclusive file not found: {exclusive_path}")
+        
+        # Load only that one file
+        import csv
+        import sys
+        csv.field_size_limit(sys.maxsize)
+        data = []
+        spam_classes = {'spam', 'promotion', 'promotional', 'promotions', 'phishing'}
+        ham_classes = {'ham', 'update', 'updates', 'primary', 'personal', 'social', 'notification', 'forum', 'verify_code', 'social_media'}
+        with open(exclusive_path, 'r', encoding='utf-8', errors='ignore') as f:
+            reader = csv.DictReader(f)
+            text_col = next((c for c in reader.fieldnames if c and c.lower() in ('text', 'email', 'message', 'body', 'content', 'sms')), None)
+            label_col = next((c for c in reader.fieldnames if c and c.lower() in ('label', 'category', 'class', 'type', 'target')), None)
+            if not text_col or not label_col:
+                raise RuntimeError(f"Could not find text/label columns in {exclusive_file}. Found: {reader.fieldnames}")
+            for row in reader:
+                raw_label = str(row.get(label_col, '')).strip().lower()
+                text = str(row.get(text_col, '')).strip()
+                if not text:
+                    continue
+                if raw_label in spam_classes:
+                    data.append(('spam', text[:1500]))
+                elif raw_label in ham_classes:
+                    data.append(('ham', text[:1500]))
+
+        total_spam = sum(1 for l, _ in data if l == 'spam')
+        total_ham = len(data) - total_spam
+        spam_ratio = total_spam / len(data) * 100 if data else 0
+        print(f"    Total: {len(data)} messages")
+        print(f"    Spam: {total_spam} ({spam_ratio:.1f}%), Ham: {total_ham} ({100-spam_ratio:.1f}%)")
+        return data
 
     # ─── Load SMS Data ──────────────────────────────────────────
     sms_data = load_sms_data()
@@ -241,62 +277,53 @@ def load_all_data():
     return all_data
 
 
-def train_test_split(data, test_ratio=0.2, seed=42):
+def train_val_test_split(data, val_ratio=0.15, test_ratio=0.15, seed=42):
     """
-    Split data into training and testing sets using STRATIFIED sampling.
+    Split data into training, validation, and testing sets using STRATIFIED sampling via scikit-learn.
 
     Statistical Rationale:
         Stratified sampling ensures that the proportion of spam and ham
-        messages is preserved in both the training and test sets. This is
-        critical for:
-        1. Unbiased estimation of prior probabilities P(Spam) and P(Ham)
-        2. Fair evaluation of classifier performance
-        3. Avoiding sampling bias in imbalanced datasets
+        messages is preserved in all sets. This is critical for unbiased evaluation.
 
     Parameters
     ----------
     data : list of tuple
         List of (label, message) tuples.
+    val_ratio : float
+        Fraction of data to use for validation (default: 0.15 = 15%).
     test_ratio : float
-        Fraction of data to use for testing (default: 0.2 = 20%).
+        Fraction of data to use for testing (default: 0.15 = 15%).
     seed : int
         Random seed for reproducibility.
 
     Returns
     -------
-    tuple of (list, list)
-        (train_data, test_data) each containing (label, message) tuples.
+    tuple of (list, list, list)
+        (train_data, val_data, test_data) each containing (label, message) tuples.
     """
-    random.seed(seed)
+    labels = [l for l, m in data]
+    
+    # First split: separate out the test set
+    train_val_data, test_data, train_val_labels, _ = sk_train_test_split(
+        data, labels, test_size=test_ratio, stratify=labels, random_state=seed
+    )
+    
+    # Second split: separate train and validation sets
+    # The validation size needs to be adjusted relative to the train_val dataset
+    val_adj_ratio = val_ratio / (1.0 - test_ratio)
+    
+    train_data, val_data = sk_train_test_split(
+        train_val_data, test_size=val_adj_ratio, stratify=train_val_labels, random_state=seed
+    )
 
-    # Separate by class for stratified splitting
-    spam_msgs = [(l, m) for l, m in data if l == 'spam']
-    ham_msgs = [(l, m) for l, m in data if l == 'ham']
+    print(f"\n  [OK] Split: {len(train_data)} train, {len(val_data)} val, {len(test_data)} test")
+    
+    train_spam = sum(1 for l, m in train_data if l == 'spam')
+    val_spam = sum(1 for l, m in val_data if l == 'spam')
+    test_spam = sum(1 for l, m in test_data if l == 'spam')
+    
+    print(f"    Train - Spam: {train_spam}, Ham: {len(train_data) - train_spam}")
+    print(f"    Val   - Spam: {val_spam}, Ham: {len(val_data) - val_spam}")
+    print(f"    Test  - Spam: {test_spam}, Ham: {len(test_data) - test_spam}")
 
-    # Shuffle within each class
-    random.shuffle(spam_msgs)
-    random.shuffle(ham_msgs)
-
-    # Calculate split indices
-    spam_test_size = int(len(spam_msgs) * test_ratio)
-    ham_test_size = int(len(ham_msgs) * test_ratio)
-
-    # Split each class
-    spam_test = spam_msgs[:spam_test_size]
-    spam_train = spam_msgs[spam_test_size:]
-
-    ham_test = ham_msgs[:ham_test_size]
-    ham_train = ham_msgs[ham_test_size:]
-
-    # Combine and shuffle
-    train_data = spam_train + ham_train
-    test_data = spam_test + ham_test
-
-    random.shuffle(train_data)
-    random.shuffle(test_data)
-
-    print(f"\n  [OK] Split: {len(train_data)} train, {len(test_data)} test")
-    print(f"    Train - Spam: {len(spam_train)}, Ham: {len(ham_train)}")
-    print(f"    Test  - Spam: {len(spam_test)}, Ham: {len(ham_test)}")
-
-    return train_data, test_data
+    return train_data, val_data, test_data

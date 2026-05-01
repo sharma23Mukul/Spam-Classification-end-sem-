@@ -81,8 +81,16 @@ class BernoulliNaiveBayes(NaiveBayesBase):
             doc_freq[label].update(unique_tokens)
 
         # Compute log-likelihoods for each word
+        # Also precompute the "all-absent baseline" per class for fast prediction:
+        #   baseline[cls] = Σ log(1 - P(w|c))  for all w ∈ V
+        # Then at prediction time we start from that baseline and only adjust
+        # for words that ARE present, replacing log(1-P) with log(P).
+        # This turns O(|V|) per prediction into O(|tokens|).
+        self._absent_baseline = {}
+
         for cls in self.classes:
             n_docs = self.class_doc_counts[cls]
+            baseline = 0.0
 
             for word in self.vocabulary:
                 # P(word present | class) with Laplace smoothing
@@ -93,8 +101,14 @@ class BernoulliNaiveBayes(NaiveBayesBase):
                 prob_present = numerator / denominator
                 prob_absent = 1.0 - prob_present
 
-                self.log_prob_present[cls][word] = math.log(prob_present)
-                self.log_prob_absent[cls][word] = math.log(prob_absent)
+                log_p = math.log(prob_present)
+                log_1mp = math.log(prob_absent)
+
+                self.log_prob_present[cls][word] = log_p
+                self.log_prob_absent[cls][word] = log_1mp
+                baseline += log_1mp
+
+            self._absent_baseline[cls] = baseline
 
         print(f"  Likelihood computation (Bernoulli):")
         print(f"    Spam documents: {self.class_doc_counts['spam']}")
@@ -117,15 +131,19 @@ class BernoulliNaiveBayes(NaiveBayesBase):
         """
         Compute log P(message | class) for the Bernoulli model.
 
-        Unlike Multinomial, Bernoulli iterates over the ENTIRE VOCABULARY
-        and considers both:
-            - Words PRESENT in the message: add log P(w | class)
-            - Words ABSENT from the message: add log(1 - P(w | class))
+        Uses a precomputed "all-absent baseline" for speed.
+        The baseline is: Σ log(1 - P(w|c)) over all words w ∈ V
+        (i.e., assume ALL words are absent).
 
-        This explicit absence penalty is what distinguishes Bernoulli NB.
+        Then for each word that IS present, we adjust by replacing
+        the absent contribution with the present contribution:
+            delta = log P(w|c) - log(1 - P(w|c))
 
-            log P(msg | class) = Σ [x_w × log P(w|c) + (1-x_w) × log(1-P(w|c))]
-                                 w ∈ V
+        This gives the same result as the full O(|V|) loop but runs
+        in O(|tokens|) time — ~1000x faster for large vocabularies.
+
+            log P(msg | class) = baseline[c] + Σ [log P(w|c) - log(1-P(w|c))]
+                                               w ∈ tokens ∩ V
 
         Parameters
         ----------
@@ -139,16 +157,17 @@ class BernoulliNaiveBayes(NaiveBayesBase):
         float
             log P(message | class)
         """
-        log_likelihood = 0.0
-        token_set = set(tokens)  # Binary presence
+        # Start from the "all words absent" baseline
+        log_likelihood = self._absent_baseline[cls]
 
-        for word in self.vocabulary:
-            if word in token_set:
-                # Word IS present: add log P(word | class)
-                log_likelihood += self.log_prob_present[cls][word]
-            else:
-                # Word is ABSENT: add log(1 - P(word | class))
-                # This penalizes the class if a typical word is missing
-                log_likelihood += self.log_prob_absent[cls][word]
+        # For each word PRESENT in the message, swap absent → present
+        token_set = set(tokens) & self.vocab_set  # Only words in vocabulary
+
+        log_present = self.log_prob_present[cls]
+        log_absent = self.log_prob_absent[cls]
+
+        for word in token_set:
+            # Replace log(1-P(w|c)) with log(P(w|c))
+            log_likelihood += log_present[word] - log_absent[word]
 
         return log_likelihood

@@ -1,0 +1,12 @@
+﻿python :   File "<string>", line 20
+At line:1 char:1
++ python -c "
++ ~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (  File "<string> 
+   ", line 20:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    print(f'Sample {total}: label={row.get(label_col, " 
+?\)!r},
+                                                      ^
+SyntaxError: unterminated string literal (detected at line 20)

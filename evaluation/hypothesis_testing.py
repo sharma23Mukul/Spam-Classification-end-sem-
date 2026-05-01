@@ -98,7 +98,7 @@ def confidence_interval_95(accuracies):
     return result
 
 
-def paired_t_test(scores_a, scores_b, alpha=0.05):
+def paired_t_test(scores_a, scores_b, model_a_name="Model A", model_b_name="Model B", alpha=0.05):
     """
     Paired t-test to compare two models' cross-validation scores.
 
@@ -130,6 +130,10 @@ def paired_t_test(scores_a, scores_b, alpha=0.05):
         K-fold accuracy scores for Model A.
     scores_b : list of float
         K-fold accuracy scores for Model B.
+    model_a_name: str
+        Name of Model A.
+    model_b_name: str
+        Name of Model B.
     alpha : float
         Significance level (default: 0.05).
 
@@ -162,9 +166,9 @@ def paired_t_test(scores_a, scores_b, alpha=0.05):
 
     if reject:
         if d_mean > 0:
-            conclusion = "Model A (Multinomial) is SIGNIFICANTLY BETTER than Model B (Bernoulli)"
+            conclusion = f"{model_a_name} is SIGNIFICANTLY BETTER than {model_b_name}"
         else:
-            conclusion = "Model B (Bernoulli) is SIGNIFICANTLY BETTER than Model A (Multinomial)"
+            conclusion = f"{model_b_name} is SIGNIFICANTLY BETTER than {model_a_name}"
     else:
         conclusion = "No significant difference between the two models"
 
@@ -175,7 +179,7 @@ def paired_t_test(scores_a, scores_b, alpha=0.05):
         'conclusion': conclusion
     }
 
-    print(f"\n  Paired t-test (Multinomial vs Bernoulli):")
+    print(f"\n  Paired t-test ({model_a_name} vs {model_b_name}):")
     print(f"    H₀: Both models have equal mean accuracy")
     print(f"    H₁: Models have different mean accuracies")
     print(f"    Differences: {[f'{d:.4f}' for d in differences]}")
@@ -189,7 +193,7 @@ def paired_t_test(scores_a, scores_b, alpha=0.05):
     return result
 
 
-def mcnemar_test(y_true, preds_a, preds_b, alpha=0.05):
+def mcnemar_test(y_true, preds_a, preds_b, model_a_name="Model A", model_b_name="Model B", alpha=0.05):
     """
     McNemar's test to compare two classifiers on the SAME dataset.
 
@@ -217,6 +221,10 @@ def mcnemar_test(y_true, preds_a, preds_b, alpha=0.05):
         Predictions from Model A.
     preds_b : list of str
         Predictions from Model B.
+    model_a_name: str
+        Name of Model A.
+    model_b_name: str
+        Name of Model B.
     alpha : float
         Significance level.
 
@@ -257,9 +265,9 @@ def mcnemar_test(y_true, preds_a, preds_b, alpha=0.05):
 
     if reject:
         if b > c:
-            conclusion = "Model A (Multinomial) is SIGNIFICANTLY BETTER"
+            conclusion = f"{model_a_name} is SIGNIFICANTLY BETTER"
         else:
-            conclusion = "Model B (Bernoulli) is SIGNIFICANTLY BETTER"
+            conclusion = f"{model_b_name} is SIGNIFICANTLY BETTER"
     else:
         conclusion = "No significant difference between the two models"
 
@@ -272,7 +280,7 @@ def mcnemar_test(y_true, preds_a, preds_b, alpha=0.05):
         'conclusion': conclusion
     }
 
-    print(f"\n  McNemar's Test (Multinomial vs Bernoulli):")
+    print(f"\n  McNemar's Test ({model_a_name} vs {model_b_name}):")
     print(f"    H₀: Both models have the same error rate")
     print(f"    H₁: Models have different error rates")
     print(f"    Contingency:")
