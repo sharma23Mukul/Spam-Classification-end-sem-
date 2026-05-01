@@ -27,6 +27,7 @@ Likelihood Calculation:
 """
 
 import math
+import re
 from models.base import NaiveBayesBase
 
 
@@ -37,21 +38,67 @@ class GaussianNaiveBayes(NaiveBayesBase):
     Uses engineered continuous features and assumes normal distribution.
     """
 
+    FEATURE_NAMES = [
+        'length', 'unique_count', 'avg_word_len', 'url_count', 'email_count',
+        'punctuation_ratio', 'uppercase_ratio', 'digit_ratio',
+        'special_char_density', 'sentence_count'
+    ]
+
     def __init__(self, alpha=1.0):
         # We use alpha for variance smoothing
         super().__init__(alpha=alpha)
         self.feature_means = {'spam': [], 'ham': []}
         self.feature_vars = {'spam': [], 'ham': []}
 
-    def _extract_features(self, tokens):
-        """Convert a list of tokens into a continuous feature vector."""
+    def _extract_features(self, tokens, raw_text=None):
+        """
+        Convert a list of tokens into a continuous feature vector.
+        
+        Features:
+            1. Token count (message length)
+            2. Unique token count (vocabulary richness)
+            3. Average word length
+            4. URL count
+            5. Email token count
+            6. Punctuation ratio (spam often abuses !, $, %)
+            7. Uppercase ratio (spam often shouts: FREE, WINNER)
+            8. Digit ratio (spam contains phone numbers, amounts)
+            9. Special character density (spam uses symbols to evade filters)
+            10. Sentence count (structural complexity indicator)
+        """
         length = len(tokens)
         unique_count = len(set(tokens))
         avg_len = sum(len(t) for t in tokens) / max(1, length)
         url_count = tokens.count('urltoken')
         email_count = tokens.count('emailtoken')
         
-        return [length, unique_count, avg_len, url_count, email_count]
+        # Reconstruct raw text from tokens if not provided
+        text = raw_text if raw_text else ' '.join(tokens)
+        text_len = max(1, len(text))
+        
+        # Punctuation ratio: fraction of characters that are punctuation
+        punct_count = sum(1 for c in text if c in '!?.,;:$%&*#@^~')
+        punctuation_ratio = punct_count / text_len
+        
+        # Uppercase ratio: fraction of alphabetic characters that are uppercase
+        alpha_chars = [c for c in text if c.isalpha()]
+        uppercase_ratio = sum(1 for c in alpha_chars if c.isupper()) / max(1, len(alpha_chars))
+        
+        # Digit ratio: fraction of characters that are digits
+        digit_ratio = sum(1 for c in text if c.isdigit()) / text_len
+        
+        # Special character density: non-alphanumeric, non-space characters
+        special_count = sum(1 for c in text if not c.isalnum() and not c.isspace())
+        special_char_density = special_count / text_len
+        
+        # Sentence count: approximate by counting sentence-ending punctuation
+        sentence_count = max(1, len(re.split(r'[.!?]+', text)) - 1) if raw_text else max(1, length // 10)
+        
+        return [
+            length, unique_count, avg_len, url_count, email_count,
+            punctuation_ratio, uppercase_ratio, digit_ratio,
+            special_char_density, sentence_count
+        ]
 
     def _compute_likelihoods(self, processed_data):
         """
@@ -90,7 +137,7 @@ class GaussianNaiveBayes(NaiveBayesBase):
             self.feature_vars[cls] = variances
             
         print(f"  Likelihood computation (Gaussian):")
-        print(f"    Features extracted: length, unique_count, avg_len, url_count, email_count")
+        print(f"    Features extracted: {', '.join(self.FEATURE_NAMES)}")
         print(f"    Spam means: {[round(m, 2) for m in self.feature_means['spam']]}")
         print(f"    Ham means:  {[round(m, 2) for m in self.feature_means['ham']]}")
 

@@ -47,7 +47,8 @@ def preprocess(text):
     Apply the full preprocessing pipeline to a single text message.
 
     Pipeline:
-        text → lowercase → remove punctuation & numbers → tokenize → remove stopwords
+        text → lowercase → remove punctuation & numbers → tokenize → 
+        lemmatize (noun+verb) → remove stopwords → generate bigrams
 
     Parameters
     ----------
@@ -57,15 +58,15 @@ def preprocess(text):
     Returns
     -------
     list of str
-        List of cleaned, lowercase tokens.
+        List of cleaned, lowercase tokens (unigrams + bigrams).
 
     Example
     -------
     >>> preprocess("FREE entry in 2 a weekly comp!")
-    ['free', 'entry', 'weekly', 'comp']
+    ['free', 'entry', 'weekly', 'comp', 'free_entry', 'entry_weekly', 'weekly_comp']
 
     >>> preprocess("Hey, are you coming to class?")
-    ['hey', 'coming', 'class']
+    ['hey', 'coming', 'class', 'hey_coming', 'coming_class']
     """
     # Step 1: Convert to lowercase
     text = text.lower()
@@ -81,13 +82,17 @@ def preprocess(text):
     # Step 4: Tokenize — split text into individual words
     tokens = word_tokenize(text)
 
-    # Step 5: Remove stopwords, lemmatize, and filter short tokens
+    # Step 5: Remove stopwords + lemmatize (both noun AND verb forms)
     tokens = [
-        lemmatizer.lemmatize(token) for token in tokens
+        lemmatizer.lemmatize(lemmatizer.lemmatize(token, pos='v'), pos='n')
+        for token in tokens
         if token not in STOP_WORDS and len(token) > 1
     ]
 
-    return tokens
+    # Step 6: Generate bigrams — captures phrases like "free_offer", "click_here"
+    bigrams = [f"{tokens[i]}_{tokens[i+1]}" for i in range(len(tokens) - 1)]
+    
+    return tokens + bigrams
 
 
 def preprocess_corpus(data):

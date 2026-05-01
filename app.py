@@ -593,6 +593,34 @@ def main():
 """, unsafe_allow_html=True)
             st.plotly_chart(plot_pr_curve(m, b, g), width='stretch', config={'displayModeBar': False})
             st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Confusion Matrix Heatmap
+            cm = m.get('confusion_matrix', {})
+            if cm:
+                st.markdown("""
+<div class="dark-card" style="padding: 24px; margin-top: 16px;">
+    <div class="chart-title">
+        <h4>Confusion Matrix (Champion)</h4>
+        <div class="chart-badge">Multinomial NB</div>
+    </div>
+""", unsafe_allow_html=True)
+                cm_data = [[cm.get('TN', 0), cm.get('FP', 0)], 
+                           [cm.get('FN', 0), cm.get('TP', 0)]]
+                fig_cm = go.Figure(data=go.Heatmap(
+                    z=cm_data, x=['Predicted Ham', 'Predicted Spam'], y=['Actual Ham', 'Actual Spam'],
+                    colorscale=[[0, '#18181B'], [0.5, '#7C3AED'], [1, '#A855F7']],
+                    text=[[str(v) for v in row] for row in cm_data], texttemplate="%{text}",
+                    textfont=dict(size=18, color='white'), showscale=False,
+                    hovertemplate='%{y} → %{x}: %{z}<extra></extra>'
+                ))
+                fig_cm.update_layout(
+                    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#A1A1AA', family="Inter, sans-serif"),
+                    xaxis=dict(showgrid=False), yaxis=dict(showgrid=False, autorange='reversed'),
+                    margin=dict(l=20, r=20, t=10, b=20), height=220
+                )
+                st.plotly_chart(fig_cm, width='stretch', config={'displayModeBar': False})
+                st.markdown("</div>", unsafe_allow_html=True)
 
     elif current_tab == "predictor":
         st.markdown("<div class='header-title'>Live Predictor Sandbox</div>", unsafe_allow_html=True)
@@ -602,7 +630,18 @@ def main():
         with pcol1:
             st.markdown('<h4 style="color: #F4F4F5; margin-bottom: 12px; margin-top: 0; font-weight: 600; display: flex; align-items: center; gap: 8px;"><span>✉️</span> Input Text Sequence</h4>', unsafe_allow_html=True)
             
-            default_msg = "URGENT: Your account has been accessed from a new IP address. Please verify your identity immediately at http://secure-verify-auth.com to prevent permanent suspension."
+            sample_messages = {
+                "🎣 Phishing Email": "URGENT: Your account has been accessed from a new IP address. Please verify your identity immediately at http://secure-verify-auth.com to prevent permanent suspension.",
+                "📢 Marketing Spam": "Congratulations! You've been selected to WIN a FREE iPhone 15 Pro! Click here NOW to claim your prize before it expires: http://free-prize-winner.com",
+                "💼 Corporate Email": "Hi team, please find attached the Q3 budget review. Let me know if you have questions before Friday's meeting. Thanks, Sarah",
+                "👋 Personal Email": "Hey! Are you coming to dinner tonight? Let me know what time works for you. Also, did you see the game last night?",
+                "🔔 Newsletter": "Your weekly digest from Streamlit: New features in version 1.32, community highlights, and upcoming webinar on data visualization best practices.",
+                "✏️ Custom Input": ""
+            }
+            
+            selected_sample = st.selectbox("Quick Test Presets", options=list(sample_messages.keys()), index=5, label_visibility="collapsed")
+            
+            default_msg = sample_messages[selected_sample] if sample_messages[selected_sample] else "URGENT: Your account has been accessed from a new IP address. Please verify your identity immediately at http://secure-verify-auth.com to prevent permanent suspension."
             message = st.text_area("Message", value=default_msg, height=200, label_visibility="collapsed", placeholder="Enter email or message text here to test the Champion model...")
             
             with st.expander("⚙️ Decision Threshold Settings"):
@@ -678,7 +717,7 @@ def main():
                             decision_threshold=ham_threshold
                         )
                     
-                    # 2. Final Result State (Custom Glass Pill Bars inside Dashed Box)
+                    # 2. Final Result State with Weighted Ensemble + Per-Word Breakdown
                     with result_placeholder.container():
                         models_data = [
                             ("Multinomial", state['metrics_multi']['accuracy'] * 100),
@@ -686,8 +725,23 @@ def main():
                             ("Gaussian", state['metrics_gauss']['accuracy'] * 100)
                         ]
                         
+                        # Weighted ensemble voting by F1 score
+                        weights = {
+                            'Multinomial': m['f1_score'],
+                            'Bernoulli': b['f1_score'],
+                            'Gaussian': g['f1_score']
+                        }
+                        total_weight = sum(weights.values())
+                        weighted_spam_prob = sum(
+                            weights[name] * results[name]['probabilities']['spam']
+                            for name in weights
+                        ) / total_weight
+                        
+                        ensemble_pred = 'spam' if weighted_spam_prob > (1 - ham_threshold) else 'ham'
+                        ensemble_conf = weighted_spam_prob if ensemble_pred == 'spam' else (1 - weighted_spam_prob)
+                        
                         preds = [r['prediction'] for r in results.values()]
-                        is_unanimous = len(set(preds)) == 1
+                        is_unanimous = len(set(p for p in preds if p != 'uncertain')) <= 1
                         consensus_color = "#34D399" if is_unanimous else "#FBBF24"
                         consensus_text = "TOTAL AGREEMENT" if is_unanimous else "MODEL DIVERGENCE"
                         
@@ -702,25 +756,33 @@ def main():
     <div class="pill-value">{acc:.1f}%</div>
 </div>'''
                             
+                        # Weighted ensemble verdict
+                        ens_color = "#F87171" if ensemble_pred == 'spam' else "#34D399"
                         html_content += f'''
 <div style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 25px;"></div>
 <div style="background: rgba(139, 92, 246, 0.02); border: 1px solid rgba(139, 92, 246, 0.1); padding: 20px; border-radius: 15px;">
-    <h4 style="margin-top: 0; display: flex; justify-content: space-between; font-size: 0.9rem; color: #E2E8F0; opacity: 0.8;">Live Ensemble Verdict <span style="font-size: 0.6rem; color: #A855F7; background: rgba(139,92,246,0.1); padding: 4px 10px; border-radius: 4px; letter-spacing: 1px; font-weight: 800;">REAL-TIME</span></h4>
-    <div style="background: rgba(0, 0, 0, 0.2); padding: 12px 18px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.05);">
-        <div style="font-size: 0.7rem; color: #94A3B8; font-weight: 700; letter-spacing: 1px;">CONSENSUS:</div>
-        <div style="color: {consensus_color}; font-weight: 800; font-size: 0.75rem; letter-spacing: 1.5px;">{consensus_text}</div>
+    <h4 style="margin-top: 0; display: flex; justify-content: space-between; font-size: 0.9rem; color: #E2E8F0; opacity: 0.8;">Weighted Ensemble Verdict <span style="font-size: 0.6rem; color: #A855F7; background: rgba(139,92,246,0.1); padding: 4px 10px; border-radius: 4px; letter-spacing: 1px; font-weight: 800;">F1-WEIGHTED</span></h4>
+    <div style="background: rgba(0, 0, 0, 0.2); padding: 12px 18px; border-radius: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(255,255,255,0.05);">
+        <div style="font-size: 0.7rem; color: #94A3B8; font-weight: 700; letter-spacing: 1px;">WEIGHTED VERDICT:</div>
+        <div style="color: {ens_color}; font-weight: 900; font-size: 1rem; letter-spacing: 1.5px;">{ensemble_pred.upper()} ({ensemble_conf:.0%})</div>
+    </div>
+    <div style="background: rgba(0, 0, 0, 0.15); padding: 8px 14px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 0.65rem; color: #64748B; font-weight: 700; letter-spacing: 1px;">CONSENSUS:</div>
+        <div style="color: {consensus_color}; font-weight: 800; font-size: 0.7rem; letter-spacing: 1.5px;">{consensus_text}</div>
     </div>
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">'''
                         
                         model_names = ['Multinomial', 'Bernoulli', 'Gaussian']
                         for name in model_names:
                             res = results[name]
+                            w = weights[name]
                             color = "#F87171" if res['prediction'] == 'spam' else "#34D399" if res['prediction'] == 'ham' else "#94A3B8"
                             html_content += f'''
         <div style="background: rgba(0,0,0,0.2); border: 1px solid {color}33; padding: 12px; border-radius: 12px; text-align: center;">
             <div style="font-size: 0.55rem; font-weight: 800; color: {color}; letter-spacing: 1px; margin-bottom: 4px;">{name.upper()}</div>
             <div style="font-size: 1rem; font-weight: 900; color: {color}; letter-spacing: 0.5px;">{res['prediction'].upper()}</div>
             <div style="font-size: 0.65rem; color: #64748B; margin-top: 4px; font-weight: 600;">{res['confidence']:.0%} Conf.</div>
+            <div style="font-size: 0.5rem; color: #475569; margin-top: 2px;">w={w:.3f}</div>
         </div>'''
                             
                         html_content += '''
@@ -729,6 +791,44 @@ def main():
 </div>'''
                         
                         st.markdown(html_content, unsafe_allow_html=True)
+                        
+                        # Per-Word Contribution Breakdown
+                        multi = state['multinomial']
+                        spam_ll = multi.log_likelihoods.get('spam', {})
+                        ham_ll = multi.log_likelihoods.get('ham', {})
+                        
+                        unigram_tokens = [t for t in tokens if '_' not in t]
+                        word_contributions = []
+                        for t in set(unigram_tokens):
+                            if t in spam_ll and t in ham_ll:
+                                score = spam_ll[t] - ham_ll[t]
+                                word_contributions.append((t, score))
+                        
+                        word_contributions.sort(key=lambda x: x[1], reverse=True)
+                        
+                        if word_contributions:
+                            top_spam = word_contributions[:5]
+                            top_ham = word_contributions[-5:]
+                            top_ham.reverse()
+                            
+                            contrib_html = '<div class="dark-card" style="top: 67px; position: relative; margin-top: 20px; padding: 25px;">'
+                            contrib_html += '<h4 style="margin-top: 0; color: #F4F4F5; font-size: 0.9rem;">🔬 Per-Word Evidence Breakdown</h4>'
+                            contrib_html += '<div style="font-size: 0.7rem; color: #71717A; margin-bottom: 15px;">log P(word|spam) − log P(word|ham) for each token in your input</div>'
+                            contrib_html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">'
+                            
+                            contrib_html += '<div><div style="color: #EF4444; font-weight: 700; font-size: 0.75rem; margin-bottom: 10px; letter-spacing: 1px;">⚠ SPAM EVIDENCE</div>'
+                            for w, s in top_spam:
+                                bar_w = min(100, abs(s) * 20)
+                                contrib_html += f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><span style="color: #F4F4F5; font-size: 0.8rem; min-width: 80px;">{w}</span><div style="flex: 1; margin: 0 10px; height: 4px; background: #27272A; border-radius: 2px; position: relative;"><div style="position: absolute; right: 0; top: 0; height: 100%; width: {bar_w}%; background: #EF4444; border-radius: 2px;"></div></div><span style="color: #EF4444; font-family: monospace; font-size: 0.75rem;">+{s:.2f}</span></div>'
+                            contrib_html += '</div>'
+                            
+                            contrib_html += '<div><div style="color: #10B981; font-weight: 700; font-size: 0.75rem; margin-bottom: 10px; letter-spacing: 1px;">✓ HAM EVIDENCE</div>'
+                            for w, s in top_ham:
+                                bar_w = min(100, abs(s) * 20)
+                                contrib_html += f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><span style="color: #F4F4F5; font-size: 0.8rem; min-width: 80px;">{w}</span><div style="flex: 1; margin: 0 10px; height: 4px; background: #27272A; border-radius: 2px; position: relative;"><div style="position: absolute; left: 0; top: 0; height: 100%; width: {bar_w}%; background: #10B981; border-radius: 2px;"></div></div><span style="color: #10B981; font-family: monospace; font-size: 0.75rem;">{s:.2f}</span></div>'
+                            contrib_html += '</div></div></div>'
+                            
+                            st.markdown(contrib_html, unsafe_allow_html=True)
 
     elif current_tab == "analytics":
         st.markdown("<div class='header-title'>Analytics Vault</div>", unsafe_allow_html=True)

@@ -217,7 +217,7 @@ class NaiveBayesBase(ABC):
 
         return predicted, probabilities
 
-    def predict_batch(self, processed_data):
+    def predict_batch(self, processed_data, decision_threshold=0.5):
         """
         Predict labels for a batch of preprocessed messages.
 
@@ -225,6 +225,8 @@ class NaiveBayesBase(ABC):
         ----------
         processed_data : list of tuple
             List of (label, tokens) tuples.
+        decision_threshold : float
+            The threshold for the 'ham' class (forwarded to predict()).
 
         Returns
         -------
@@ -236,7 +238,7 @@ class NaiveBayesBase(ABC):
         probs_list = []
 
         for label, tokens in processed_data:
-            pred, probs = self.predict(tokens)
+            pred, probs = self.predict(tokens, decision_threshold=decision_threshold)
             y_true.append(label)
             y_pred.append(pred)
             probs_list.append(probs)
