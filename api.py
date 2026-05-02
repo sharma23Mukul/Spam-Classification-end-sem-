@@ -58,7 +58,7 @@ def load_saved_model():
 
 class PredictionRequest(BaseModel):
     message: str
-    decision_threshold: float = 0.65  # Developer Default
+    decision_threshold: float = 0.77  # Developer Default
 
 class PredictionResponse(BaseModel):
     prediction: str
