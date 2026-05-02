@@ -71,8 +71,19 @@ class PredictionResponse(BaseModel):
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
-    """Health check endpoint."""
-    return {"status": "online", "model": "Multinomial Naïve Bayes"}
+    """Health check endpoint with model diagnostics."""
+    global loaded_model
+    stats = {
+        "status": "online",
+        "model": "Multinomial Naive Bayes",
+        "vocab_size": 0
+    }
+    if loaded_model:
+        try:
+            stats["vocab_size"] = len(loaded_model.log_likelihoods.get("spam", {}))
+        except:
+            pass
+    return stats
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict_spam(request: PredictionRequest):
