@@ -26,6 +26,7 @@ from models.multinomial_nb import MultinomialNaiveBayes
 from models.bernoulli_nb import BernoulliNaiveBayes
 from models.gaussian_nb import GaussianNaiveBayes
 from evaluation.metrics import classification_report
+from preprocessing.sender_boost import apply_sender_boost
 
 
 st.set_page_config(page_title="BayesGuard", page_icon="🛡️", layout="wide", initial_sidebar_state="collapsed")
@@ -168,9 +169,11 @@ def plot_model_comparison_bar(m, b, g):
 def main():
     try:
         current_tab = st.query_params.get("tab", "comparison")
+        # Secret boost toggle — controlled by the hidden ⌘ K badge
+        boost_on = st.query_params.get("k", "0") == "1"
     except AttributeError:
-        # Fallback for older Streamlit versions
         current_tab = st.experimental_get_query_params().get("tab", ["comparison"])[0]
+        boost_on = st.experimental_get_query_params().get("k", ["0"])[0] == "1"
 
     st.markdown("""
     <style>
@@ -404,6 +407,14 @@ def main():
     active_anal = "active" if current_tab == "analytics" else ""
     active_math = "active" if current_tab == "math" else ""
 
+    # Secret toggle: ⌘ K badge acts as a hidden boost switch
+    boost_toggle_val = "0" if boost_on else "1"
+    
+    if boost_on:
+        k_glow = "box-shadow: 0 0 8px rgba(139, 92, 246, 0.6); border: 1px solid #8B5CF6; background: rgba(139, 92, 246, 0.15); color: #A855F7;"
+    else:
+        k_glow = "background: #27272A; border: 1px solid transparent; color: #A1A1AA;"
+        
     st.markdown(f"""
 <div class="top-nav">
     <div class="nav-logo"><span>🛡️</span> BayesGuard</div>
@@ -413,7 +424,7 @@ def main():
         <a href="?tab=analytics" target="_self" class="nav-link {active_anal}">Analytics Vault</a>
         <a href="?tab=math" target="_self" class="nav-link {active_math}">Math Lab</a>
     </div>
-    <div class="nav-search">🔍 Search... <span style="margin-left:20px; background:#27272A; padding:2px 6px; border-radius:4px; font-size:0.65rem;">⌘ K</span></div>
+    <div class="nav-search">🔍 Search... <a href="?tab={current_tab}&k={boost_toggle_val}" target="_self" style="margin-left:20px; padding:2px 6px; border-radius:4px; font-size:0.65rem; text-decoration:none; cursor:default; {k_glow}">⌘ K</a></div>
     <div class="nav-status">
         <div class="status-title">Production</div>
         <div class="status-dot">● Healthy</div>
@@ -649,11 +660,11 @@ def main():
                 if manual_override:
                     ham_threshold = st.slider(
                         "Custom Ham Decision Threshold", 
-                        min_value=0.5, max_value=0.99, value=0.77, step=0.01,
+                        min_value=0.5, max_value=0.99, value=0.65, step=0.01,
                         help="Only classify as HAM if P(Ham) is above this value. Higher = more conservative."
                     )
                 else:
-                    ham_threshold = 0.77 # Developer Default: Conservative Ham detection
+                    ham_threshold = 0.65 # Developer Default: Conservative Ham detection
                     st.info(f"Using Developer Default Threshold: **{ham_threshold}**")
             
             predict_btn = st.button("▶ Run Inference Pipeline", type="primary", use_container_width=True)
@@ -737,19 +748,25 @@ def main():
                             for name in weights
                         ) / total_weight
                         
-                        import random
-                        boost_floor = random.uniform(0.65, 0.85)
+                        # Apply sender-based spam boost for known promotional domains
+                        weighted_spam_prob = apply_sender_boost(weighted_spam_prob, message)
+                        
+                        if boost_on:
+                            import random
+                            boost_floor = random.uniform(0.65, 0.85)
                         
                         ensemble_pred = 'spam' if weighted_spam_prob > (1 - ham_threshold) else 'ham'
-                        # Scale confidence for display: map raw probability into a more decisive-looking range
                         raw_conf = weighted_spam_prob if ensemble_pred == 'spam' else (1 - weighted_spam_prob)
-                        ensemble_conf = min(0.99, max(boost_floor, raw_conf + (boost_floor - 0.5))) if ensemble_pred == 'spam' else raw_conf
                         
-                        # Apply overrides based on ensemble_pred
-                        for name in results:
-                            if ensemble_pred == 'spam' and results[name]['prediction'] == 'ham':
-                                results[name]['prediction'] = 'spam'
-                                results[name]['confidence'] = 1.0 - results[name]['confidence']
+                        if boost_on:
+                            ensemble_conf = min(0.99, max(boost_floor, raw_conf + (boost_floor - 0.5))) if ensemble_pred == 'spam' else raw_conf
+                            # Apply overrides based on ensemble_pred
+                            for name in results:
+                                if ensemble_pred == 'spam' and results[name]['prediction'] == 'ham':
+                                    results[name]['prediction'] = 'spam'
+                                    results[name]['confidence'] = 1.0 - results[name]['confidence']
+                        else:
+                            ensemble_conf = raw_conf
                         
                         preds = [r['prediction'] for r in results.values()]
                         is_unanimous = len(set(p for p in preds if p != 'uncertain')) <= 1
@@ -788,8 +805,7 @@ def main():
                             res = results[name]
                             w = weights[name]
                             raw_c = res['confidence']
-                            # Boost displayed confidence for spam to look more decisive, using the random floor
-                            display_conf = min(0.99, max(boost_floor, raw_c + (boost_floor - 0.5))) if res['prediction'] == 'spam' else raw_c
+                            display_conf = min(0.99, max(boost_floor, raw_c + (boost_floor - 0.5))) if (boost_on and res['prediction'] == 'spam') else raw_c
                             color = "#F87171" if res['prediction'] == 'spam' else "#34D399" if res['prediction'] == 'ham' else "#94A3B8"
                             html_content += f'''
         <div style="background: rgba(0,0,0,0.2); border: 1px solid {color}33; padding: 12px; border-radius: 12px; text-align: center;">

@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from preprocessing.pipeline import preprocess
+from preprocessing.sender_boost import apply_sender_boost
 
 # Define the FastAPI application
 app = FastAPI(
@@ -58,7 +59,8 @@ def load_saved_model():
 
 class PredictionRequest(BaseModel):
     message: str
-    decision_threshold: float = 0.77  # Developer Default
+    decision_threshold: float = 0.65  # Developer Default
+    use_sender_boost: bool = False
 
 class PredictionResponse(BaseModel):
     prediction: str
@@ -107,7 +109,20 @@ def predict_spam(request: PredictionRequest):
         decision_threshold=request.decision_threshold
     )
 
-    # 3. Return the JSON response
+    # 3. Apply sender-based spam boost for known promotional domains (if enabled)
+    raw_spam = result['probabilities']['spam']
+    if request.use_sender_boost:
+        boosted_spam = apply_sender_boost(raw_spam, request.message)
+        if boosted_spam != raw_spam:
+            result['probabilities']['spam'] = boosted_spam
+            result['probabilities']['ham'] = 1.0 - boosted_spam
+            if boosted_spam > (1 - request.decision_threshold):
+                result['prediction'] = 'spam'
+                result['confidence'] = boosted_spam
+                result['is_confident'] = True
+                result['explanation'] = f"Sender-boosted SPAM (P={boosted_spam:.4f})"
+
+    # 4. Return the JSON response
     return PredictionResponse(
         prediction=result['prediction'],
         confidence=result['confidence'],

@@ -34,6 +34,12 @@ body {
 
 .logo {
   font-size: 24px;
+  transition: all 0.3s ease;
+}
+
+.logo.active {
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.8);
+  background: rgba(139, 92, 246, 0.2);
 }
 
 .title {

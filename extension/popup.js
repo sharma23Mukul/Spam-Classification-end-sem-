@@ -9,16 +9,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   const errorMsg = document.getElementById('error');
   const thresholdSlider = document.getElementById('threshold-slider');
   const thresholdVal = document.getElementById('threshold-val');
+  const secretToggle = document.getElementById('secret-toggle');
+  
+  let useSenderBoost = false;
 
   // Ensure FastAPI server URL is correct
   const API_URL = "https://spam-classification-end-sem.onrender.com/predict";
 
-  // Load saved threshold
-  const settings = await chrome.storage.local.get(['hamThreshold']);
+  // Load saved settings
+  const settings = await chrome.storage.local.get(['hamThreshold', 'useSenderBoost']);
   if (settings.hamThreshold) {
     thresholdSlider.value = settings.hamThreshold;
     thresholdVal.innerText = settings.hamThreshold;
   }
+  if (settings.useSenderBoost) {
+    useSenderBoost = settings.useSenderBoost;
+    if (useSenderBoost) {
+        secretToggle.classList.add('active');
+    }
+  }
+
+  // Secret Toggle Logic
+  secretToggle.addEventListener('click', () => {
+      useSenderBoost = !useSenderBoost;
+      if (useSenderBoost) {
+          secretToggle.classList.add('active');
+      } else {
+          secretToggle.classList.remove('active');
+      }
+      chrome.storage.local.set({ useSenderBoost: useSenderBoost });
+  });
 
   // Update threshold UI and save
   thresholdSlider.addEventListener('input', (e) => {
@@ -57,7 +77,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         },
         body: JSON.stringify({ 
           message: emailText,
-          decision_threshold: parseFloat(thresholdSlider.value)
+          decision_threshold: parseFloat(thresholdSlider.value),
+          use_sender_boost: useSenderBoost
         })
       });
 

@@ -9,7 +9,7 @@ with open('models/app_bundle.pkl', 'rb') as f:
 
 m = bundle['multinomial']
 
-msg = """Hey community,
+msg = sys.argv[1] if len(sys.argv) > 1 else """Hey community,
 It's time to check out the latest and greatest in Streamlit. First up, release 1.56 is here with some exciting new additions — a brand-new dropdown widget, native iframe support, and a long-requested filtering upgrade for selects! There's also a new pivot table component to try out, two reads from the team on building apps in the age of AI agents, and a couple big events coming up. Keep reading to learn more!
 Release 1.56
 Highlights
