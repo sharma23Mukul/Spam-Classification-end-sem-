@@ -77,7 +77,7 @@ def load_and_train():
     }
 
 
-def plot_roc_curve(metrics_m, metrics_b):
+def plot_roc_curve(metrics_m, metrics_b, metrics_g):
     fig = go.Figure()
     
     if metrics_m.get('fpr') is not None:
@@ -85,6 +85,9 @@ def plot_roc_curve(metrics_m, metrics_b):
         
     if metrics_b.get('fpr') is not None:
         fig.add_trace(go.Scatter(x=metrics_b['fpr'], y=metrics_b['tpr'], mode='lines', name='Bernoulli', line=dict(color='#10B981', width=4, dash='dash')))
+    
+    if metrics_g.get('fpr') is not None:
+        fig.add_trace(go.Scatter(x=metrics_g['fpr'], y=metrics_g['tpr'], mode='lines', name='Gaussian', line=dict(color='#F59E0B', width=3, dash='dot')))
                                  
     fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', showlegend=False, line=dict(color='#3F3F46', width=3, dash='dash')))
                              
@@ -99,18 +102,25 @@ def plot_roc_curve(metrics_m, metrics_b):
     return fig
 
 
-def plot_pr_curve(metrics_m, metrics_b):
+def plot_pr_curve(metrics_m, metrics_b, metrics_g):
     fig = go.Figure()
     
     if metrics_m.get('recalls') is not None:
         fig.add_trace(go.Scatter(x=metrics_m['recalls'], y=metrics_m['precisions'], mode='lines', name='Multinomial (Champion)', line=dict(color='#A855F7', width=6)))
+    
+    if metrics_b.get('recalls') is not None:
+        fig.add_trace(go.Scatter(x=metrics_b['recalls'], y=metrics_b['precisions'], mode='lines', name='Bernoulli', line=dict(color='#10B981', width=4, dash='dash')))
+    
+    if metrics_g.get('recalls') is not None:
+        fig.add_trace(go.Scatter(x=metrics_g['recalls'], y=metrics_g['precisions'], mode='lines', name='Gaussian', line=dict(color='#F59E0B', width=3, dash='dot')))
                              
     fig.update_layout(
         plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#A1A1AA', family="Inter, sans-serif"),
         xaxis=dict(title="RECALL", gridcolor='#27272A', showline=False, zeroline=False),
         yaxis=dict(title="PRECISION", gridcolor='#27272A', showline=False, zeroline=False),
-        margin=dict(l=40, r=20, t=20, b=40), height=220, showlegend=False
+        margin=dict(l=40, r=20, t=20, b=40), height=220,
+        legend=dict(yanchor="top", y=0.95, xanchor="right", x=0.95, bgcolor="#18181B", bordercolor="#27272A", borderwidth=1)
     )
     return fig
 
@@ -572,7 +582,7 @@ def main():
         <div class="chart-badge">AUC {m.get('roc_auc', 0.992):.3f}</div>
     </div>
 """, unsafe_allow_html=True)
-            st.plotly_chart(plot_roc_curve(m, b), width='stretch', config={'displayModeBar': False})
+            st.plotly_chart(plot_roc_curve(m, b, g), width='stretch', config={'displayModeBar': False})
             st.markdown("</div>", unsafe_allow_html=True)
             
             st.markdown("""
@@ -581,7 +591,7 @@ def main():
         <h4>Precision-Recall Curve</h4>
     </div>
 """, unsafe_allow_html=True)
-            st.plotly_chart(plot_pr_curve(m, b), width='stretch', config={'displayModeBar': False})
+            st.plotly_chart(plot_pr_curve(m, b, g), width='stretch', config={'displayModeBar': False})
             st.markdown("</div>", unsafe_allow_html=True)
 
     elif current_tab == "predictor":
